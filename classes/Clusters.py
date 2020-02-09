@@ -76,6 +76,7 @@ class Clusters:
         self.config = configparser.ConfigParser()
         self.config.read(self.inifile)
         self.dict_standardized_pred_rmse = {}
+        self.output_label = output_label
 
         logger.debug(f"Sections: {[prec for prec in self.config.sections() if 'PRED:' in prec]}")
         self.sec = [prec for prec in self.config.sections() if 'PRED:' in prec][0]
@@ -172,7 +173,6 @@ class Clusters:
         self.pin_arrays = None
         self.Z = None
         self.Z_dict = None
-        self.output_label = output_label
 
     def _get_dim_boundaries(self, label):
         """ get dimensions of latitudes and longitudes from ini-file"""
