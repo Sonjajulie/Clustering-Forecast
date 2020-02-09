@@ -15,7 +15,7 @@ foreach pred ($predictand)
     # set last parameter to -1 if all states from predictand should be
     # taken, otherwise set length of precursors
     # 5th argument is for bootstrap method.
-    sbatch --output=output_$var.out --error=error_$var.err --job-name=cl_$var main_cheyenne_composites.sh $var $pred 1980 10
+    sbatch --output=output_$var.out --error=error_$var.err --job-name=cl_$var main_cheyenne_composites.sh $var $pred 1980 10 not-standardized
     end
 end
 

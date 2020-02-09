@@ -22,10 +22,11 @@ import sys
 def main():
     # variables
     inifile = sys.argv[1]
-    logger.debug(f"inifile: {inifile}")
+    output_label = sys.arv[5]
+    logger.debug(f"inifile: {inifile}", output_label)
     method_name = "ward"
     for k in [3]:
-        with open(rf"output/{sys.argv[3]}/Cluster/ward_Cluster_{k}/files/timeSeries_ward_{k}_f.txt", "rb") as input_file:
+        with open(rf"output-{output_label}/{sys.argv[3]}/Cluster/ward_Cluster_{k}/files/timeSeries_ward_{k}_f.txt", "rb") as input_file:
             f = np.array(pickle.load(input_file), dtype=int)
         f = np.array(f.reshape((2, int(f.shape[0]/2)))[1], dtype=int)
         if int(sys.argv[4]) > 0:

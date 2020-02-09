@@ -63,7 +63,7 @@ def _fancy_dendrogram(*args, **kwargs):
 class Clusters:
     """ Class to analyze Predictand """
 
-    def __init__(self, inifile_in):
+    def __init__(self, inifile_in, output_label):
         """
         Initialize Clusters--> read file(s) using ini-file
         apply mask, if necessary
@@ -172,6 +172,7 @@ class Clusters:
         self.pin_arrays = None
         self.Z = None
         self.Z_dict = None
+        self.output_label = output_label
 
     def _get_dim_boundaries(self, label):
         """ get dimensions of latitudes and longitudes from ini-file"""
@@ -200,12 +201,6 @@ class Clusters:
                                               [np.array(self.dict_predict[label])
                                               .shape[0], -1])
         self.dict_pred_1D[label][self.dict_pred_1D[label] != self.dict_pred_1D[label]] = 0
-        # calculate anomalies
-        self.dict_pred_1D[label] -= np.mean(self.dict_pred_1D[label], axis=0)
-
-        self.sigma_var = np.sum(self.dict_pred_1D[label] * self.dict_pred_1D[label]) / \
-                               (self.dict_pred_1D[label].shape[0] * self.dict_pred_1D[label].shape[1])
-        self.dict_pred_1D[label] = self.dict_pred_1D[label] # / self.sigma_var
 
     def _set_method_name(self, method_name):
         """ set method """
@@ -260,8 +255,11 @@ class Clusters:
         self.varAnom = self.dict_pred_1D[label] - self.varmean
         # divided by grid (1d-Array) and years - 1 (the year which we would like to forecast)
         # standardize
-        self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
-        self.dict_standardized_pred_1D[label] = self.varAnom   / self.sigma_var
+        if self.output_label == "standardized":
+            self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+            self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var
+        else:
+            self.dict_standardized_pred_1D[label] = self.varAnom
 
     def calculate_clusters(self, method_name, k):
         """calculate clusters for predictand variable"""
@@ -274,13 +272,15 @@ class Clusters:
         self._cluster_frequency()
         self._set_clusters_1d()
         self._set_clusters_reshape()
-        # set directories for plots and files
-        self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
-        Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
-        Path(self.directory_files).mkdir(parents=True, exist_ok=True)
+
         # calculate frequency
         # self._states_of_each_cluster()
+        # set directories for plots and files
+        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
+        Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
+        self._set_directory_files(f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
+        Path(self.directory_files).mkdir(parents=True, exist_ok=True)
+
 
     def _cluster_frequency(self):
         """ calculate cluster frequency ffrom f"""

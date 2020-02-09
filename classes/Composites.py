@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 class Composites:
     """Store and analyse possible precursors"""
 
-    def __init__(self, inifile_in):
+    def __init__(self, inifile_in, output_label):
         """ Store all parameters necessary for loading the netcdf file"""
         logger.info("Initialize class composites")
         self.ini = inifile_in
@@ -55,6 +55,7 @@ class Composites:
         self.end_n = None
         self.time_dim = None
         self.bootstrap_arrays = None
+        self.output_label = output_label
 
         # all precursors in the ini-file should be assigned to the dictionary
         self._initialize_attributes()
@@ -228,8 +229,11 @@ class Composites:
         logger.info("Calculate Standardized values")
         self.varmean = np.mean(self.dict_prec_1D[label], axis=0)
         self.varAnom = self.dict_prec_1D[label] - self.varmean
-        self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
-        self.dict_standardized_precursors[label] = self.varAnom  # / self.sigma_var
+        if self.output_label == "standardized":
+            self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+            self.dict_standardized_precursors[label] = self.varAnom / self.sigma_var
+        else:
+            self.dict_standardized_precursors[label] = self.varAnom
 
     def _create_composites(self, key, f, k, method_name, predictand):
         """ create composites of 1D precursors"""
@@ -243,9 +247,9 @@ class Composites:
         for i_cl in range(int(k)):
             self.dict_composites[key][i_cl] = np.divide(self.dict_composites[key][i_cl], (self.cluster_frequency[i_cl]))
 
-        self._set_directory_plots(f"output//{predictand}/Composites/{key}/{method_name}_Composite_{k}/plots/")
+        self._set_directory_plots(f"output-{self.output_label}//{predictand}/Composites/{key}/{method_name}_Composite_{k}/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output//{predictand}/Composites/{key}/{method_name}_Composite_{k}/files/")
+        self._set_directory_files(f"output-{self.output_label}//{predictand}/Composites/{key}/{method_name}_Composite_{k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
 
     def plot_composites(self, k, percent_boot):
