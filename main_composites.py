@@ -22,7 +22,7 @@ import sys
 def main():
     # variables
     inifile = sys.argv[1]
-    output_label = sys.arv[5]
+    output_label = sys.argv[5]
     logger.debug(f"inifile: {inifile}", output_label)
     method_name = "ward"
     for k in [3]:

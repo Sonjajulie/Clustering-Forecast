@@ -22,7 +22,7 @@ import sys
 def main():
     # variables
     var = sys.argv[1]
-    output_label = sys.arv[3]
+    output_label = sys.argv[3]
     pred_clusters = Clusters(f"ini/clusters_America_{var}.ini", output_label)
     # pred_clusters = Clusters(f"ini/clusters_America_TS.ini")
     method_name = 'ward'
