@@ -22,10 +22,10 @@ import sys
 def main():
     # variables
     inifile = sys.argv[1]
-    output_label = sys.argv[5]
-    logger.debug(f"inifile: {inifile}", output_label)
+    output_label = sys.argv[6]
+    logger.debug(f"inifile: {inifile}")
     method_name = "ward"
-    for k in [3]:
+    for k in [3,4,5,6,7,8,9]:
         with open(rf"output-{output_label}/{sys.argv[3]}/Cluster/ward_Cluster_{k}/files/timeSeries_ward_{k}_f.txt", "rb") as input_file:
             f = np.array(pickle.load(input_file), dtype=int)
         f = np.array(f.reshape((2, int(f.shape[0]/2)))[1], dtype=int)
@@ -34,7 +34,7 @@ def main():
             f = f[:flength]
             logger.debug(f"check size of f: {f.shape} == {flength}")
             print(f"f: {f.shape} == {flength}")
-        composites = Composites(inifile)
+        composites = Composites(inifile,output_label)
         composites.get_composites_data_1d(f, k, method_name, sys.argv[3])
         composites.plot_composites(k, float(sys.argv[5]))
         composites.save_composites(k)
