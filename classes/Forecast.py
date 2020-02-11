@@ -12,7 +12,7 @@ import numpy as np
 import ast
 import configparser
 from scipy import stats
-
+from itertools import combinations
 logging.config.dictConfig(config)
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,6 @@ class Forecast:
         """
         logger.info('Read ini-file')
         self.inifile = inifile_in
-        self._get_forecast_parameters(k, method_name)
-
         # initialize data
         self.alpha_all = None
         self.alpha_matrix = None
@@ -34,6 +32,10 @@ class Forecast:
         self.selected_composites_1D, self.selected_data_1d = None, None
         self.t_corr_arr = None
         self.t_corr_signif_arr = None
+        self.list_precursors_all = []
+        self.list_precursors = []
+        # initialize list of possible precursors according to k and method_name
+        self._get_forecast_parameters(k, method_name)
 
     def _get_forecast_parameters(self, k, method_name):
         """
@@ -47,8 +49,8 @@ class Forecast:
         self.config.read(self.inifile)
         """ get begin and end time for forecast from ini file"""
         self.beg_year = int(self.config["Forecast-Parameters"]["begin"])
-        assert self.beg_year >= 1967, \
-            logger.error(f"Start year of forecast must be 1967 or higher! It is {self.beg_year}")
+        # assert self.beg_year >= 1967, \
+        #     logger.error(f"Start year of forecast must be 1967 or higher! It is {self.beg_year}")
         self.end_year = int(self.config["Forecast-Parameters"]["end"])
         self.diff = self.end_year - self.beg_year
         assert self.diff > 0, \
@@ -56,9 +58,33 @@ class Forecast:
         self.end_year = self.config["Forecast-Parameters"]["end"]
         # Select from saveArray which precursors should be used to calculate forecast
         # self.list_precursors = ast.literal_eval(config.get("Forecast-Parameters", "forecastprecs"))
-        self.list_precursors = ast.literal_eval(self.config.get("Forecast-Parameters", "forecastprecs"))
+        self.list_precursors_all = ast.literal_eval(self.config.get("Forecast-Parameters", "forecastprecs"))
         self.plot = self.config["Forecast-Parameters"]["plot"]
+        self.all_combinations = self.config["Forecast-Parameters"]["all_combinattions"]
+        if self.all_combinations:
+            for r in range(len(self.list_precursors_all)):
+                self.list_precursors.append(list(combinations(self.list_precursors_all, r)))
 
+    def prediction_train_test(self, clusters_1d, composites_1d, X_test, year):
+        """make forecast
+        :type clusters_1d: dict of clusters
+        :type composites_1d: dict of compostes
+        :type data_year_1d: dict of precursors
+        :type year: int
+        """
+        # Merge only those precursors which were selected
+        self.selected_composites_1D, self.selected_data_1d = self._merge_selected_precursors(composites_1d,
+                                                                                             X_test, year)
+
+        # Calculate projection coefficients
+        self.alpha_matrix = np.zeros((self.k, self.k))
+        self.alpha_all = self._projection_coefficients()
+
+        self.forecast_var = np.zeros(len(clusters_1d[0]))
+        for i in range(int(self.k)):
+            self.forecast_var += self.alpha_all[i] * clusters_1d[int(i)]
+
+        return self.forecast_var
     def prediction(self, clusters_1d, composites_1d, data_year_1d, year):
         """make forecast
         :type clusters_1d: dict of clusters
