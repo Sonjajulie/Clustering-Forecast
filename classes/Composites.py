@@ -8,7 +8,7 @@ Created on Tue Dec 10 16:11:43 2019
 # noinspection PyUnresolvedReferences
 import os
 import matplotlib as mpl
-if os.environ.get('DISPLAY','') == '':
+if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -19,7 +19,6 @@ import configparser
 import logging
 import os
 from logging import config
-from config_dict import config
 from pathlib import Path
 import cartopy.feature as cfeature
 import cartopy.crs as ccrs
@@ -32,18 +31,23 @@ import pandas as pd
 
 # seed random number generator
 np.random.seed(0)
-
 sns.set()
-logging.config.dictConfig(config)
-logger = logging.getLogger(__name__)
 
 
 class Composites:
     """Store and analyse possible precursors"""
 
-    def __init__(self, inifile_in, output_label):
-        """ Store all parameters necessary for loading the netcdf file"""
-        logger.info("Initialize class composites")
+    def __init__(self, inifile_in: str, output_label: str, cl_config: dict):
+        """
+        Store all parameters necessary for loading the netcdf file
+        :param inifile_in: file for initialization of variable
+        :param output_label: label for substring of output directory
+        :param cl_config: dictionary, where all information of logger is stored from classes/config
+        """
+        logging.config.dictConfig(cl_config)
+        self.logger = logging.getLogger(__name__)
+        self.logger.info('Read ini-file')
+        self.logger.info("Initialize class composites")
         self.ini = inifile_in
         self.config = configparser.ConfigParser()
         self.config.read(self.ini)
@@ -102,7 +106,7 @@ class Composites:
                 self.list_of_files = sorted(self.list_of_files)
                 length_files = len(self.list_of_files)
                 for file in range(length_files):
-                    logger.debug(f"file {file}: {self.list_of_files[file]}")
+                    self.logger.debug(f"file {file}: {self.list_of_files[file]}")
                     self.dict_precursors[f"{self.var}_{file}"] = \
                         xr.open_dataset(self.list_of_files[file])[self.config[prec]["var"]]
                     self._set_area_composite(f"{self.var}_{file}", prec)
@@ -121,7 +125,7 @@ class Composites:
                 list_time_model = [f"model {imodel + 1}, date: {jtime.year}-{jtime.month}-{jtime.day}" for imodel
                                    in range(length_files)
                                    for jtime in self.dict_precursors[f"{self.var}_{imodel}"].coords['time'].values]
-                logger.debug(f"dims {self.label_lat}, {self.label_lon}")
+                self.logger.debug(f"dims {self.label_lat}, {self.label_lon}")
                 self.dict_precursors = {self.var: xr.DataArray(np.concatenate(list(self.dict_precursors.values())),
                                                                coords={'time': list_time_model,
                                                                        'lon': self.dict_precursors[f"{self.var}_{0}"]
@@ -150,10 +154,13 @@ class Composites:
         self.aspect_ratio = 1
         self.map_proj_nr = 0
 
-    def _set_area_composite(self, label, config_var):
+    def _set_area_composite(self, label: str, config_var: str):
         """
          Get Longitudes and Latitudes, check whether latitudes go form -90 to 90 or from 90 to -90,
         if the letter, reverse order
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        :param config_var: variable name of precursor section on config
         """
         self._get_dim_boundaries(config_var)
         # check name for latitude and longitude and cut area accordingly
@@ -184,15 +191,23 @@ class Composites:
         else:
             raise ValueError("Spatial attribute (e.g. latitude and longitude) not found!")
 
-    def _transform_to_1d_and_remove_nans(self, label):
+    def _transform_to_1d_and_remove_nans(self, label: str):
+        """
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        """
         """ transfrom array and set values 0, where no data is found as well reshape to 1D"""
-        logger.info('Reshape to 1D array and remove nans')
+        self.logger.info('Reshape to 1D array and remove nans')
         self.dict_prec_1D[label] = np.reshape(np.array(self.dict_precursors[label]),
                                               [np.array(self.dict_precursors[label])
                                               .shape[0], -1])
         self.dict_prec_1D[label][self.dict_prec_1D[label] != self.dict_prec_1D[label]] = 0
 
-    def _get_dim_boundaries(self, config_var):
+    def _get_dim_boundaries(self, config_var: str):
+        """
+        :param config_var: variable name of precursor section on config
+        get boundaries of initialization file
+        """
         """ get dimensions of latitudes and longitudes from ini-file"""
         if self.config.has_option(config_var, "coords"):
             self.lat_min, self.lat_max, self.lon_min, self.lon_max = \
@@ -200,33 +215,54 @@ class Composites:
             self.lat_bnds, self.lon_bnds = [self.lat_min, self.lat_max], [self.lon_min, self.lon_max]
 
     def _get_and_apply_mask(self, label, config_var):
-        """apply mask to input-file"""
+        """
+        apply mask to input-file
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        :param config_var: variable name of precursor section on config
+        """
         self.dict_mask[config_var] = np.loadtxt(self.config[config_var]["mask"])
         self.dict_precursors[label] = self.dict_precursors[label].where(self.dict_mask[config_var] == 0, 0)
 
     def reshape_precursors_to_1d(self):
         """ reshape precursors into 1D arrays"""
         for nb, prec in enumerate(self.dict_precursors.keys()):
-            self._set_v_arr(prec)
+            self._set_v_arr(nb, prec)
             self.dict_prec_1D[prec] = np.reshape(self.v_arr, (self.v_arr.shape[0], -1))
 
-    def _set_cluster_frequency(self, f):
-        """ calculate frequency of f"""
+    def _set_cluster_frequency(self, f: np.ndarray):
+        """
+        calculate frequency of f
+        :param f: np.ndarray containing the cluster number for each state
+        """
         self.cluster_frequency = np.bincount(f)
 
-    def get_composites_data_1d(self, f, k, method_name, predictand):
-        """ calculate composites of standardized precursors"""
+    def get_composites_data_1d(self, f: np.ndarray, k: int, method_name: str, predictand: str):
+        """
+        calculate composites of standardized precursors
+        :param f: np.ndarray containing the cluster number for each state
+        :param k: cluster number
+        :param method_name: name of method used to calculate clusters (e.g. ward)
+        :param predictand: name of predicand
+        """
         self._set_cluster_frequency(f)
         for prec in self.dict_precursors.keys():
             self._create_composites(prec, f, k, method_name, predictand)
 
-    def _set_v_arr(self, label):
-        """ get array from dictionary for certain key"""
-        self.v_arr = np.array(self.dict_precursors[label][self.config[self.precs_sections[i]]["var"]].squeeze())
+    def _set_v_arr(self, prec: str, nb: int):
+        """ get array from dictionary for certain key
+        :param prec: key of dict_precursors dictionary
+        :param nb: number of precursor: Is this really needed?
+        """
+        self.v_arr = np.array(self.dict_precursors[prec]["var"].squeeze())
 
-    def _calculate_standardized_precursors(self, label):
-        """ Calculate standardized composites by mean and standard deviation """
-        logger.info("Calculate Standardized values")
+    def _calculate_standardized_precursors(self, label: str):
+        """
+        Calculate standardized composites by mean and standard deviation
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        """
+        self.logger.info("Calculate Standardized values")
         self.varmean = np.mean(self.dict_prec_1D[label], axis=0)
         self.varAnom = self.dict_prec_1D[label] - self.varmean
         if self.output_label == "standardized":
@@ -235,9 +271,16 @@ class Composites:
         else:
             self.dict_standardized_precursors[label] = self.varAnom
 
-    def _create_composites(self, key, f, k, method_name, predictand):
-        """ create composites of 1D precursors"""
-        logger.info("Calculate composites")
+    def _create_composites(self, key: str, f: np.ndarray, k: int, method_name: str, predictand: str):
+        """
+        create composites of 1D precursors
+        :param key: key/variable name of composites
+        :param f: np.ndarray containing the cluster number for each state
+        :param k: cluster number
+        :param method_name: name of method used to calculate clusters (e.g. ward)
+        :param predictand: name of predictand
+        """
+        self.logger.info("Calculate composites")
         self.dict_composites[key] = np.zeros((int(k), self.dict_standardized_precursors[key].shape[1]),
                                              dtype=np.float64)
 
@@ -252,13 +295,21 @@ class Composites:
         self._set_directory_files(f"output-{self.output_label}//{predictand}/Composites/{key}/{method_name}_Composite_{k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
 
-    def plot_composites(self, k, percent_boot):
-        """Plot clusters"""
+    def plot_composites(self, k: int, percent_boot: int):
+        """
+        Plot clusters
+        :param k: cluster number
+        :param percent_boot: percentage for which composite is significant
+        """
         self._save_composites_plot(k, percent_boot)
 
-    def _save_composites_plot(self, k, percent_boot):
-        """ save clusters into one plot using xarray library"""
-        logger.info("Plot composites")
+    def _save_composites_plot(self, k: int, percent_boot: int):
+        """
+        save clusters into one plot using xarray library
+        :param k: cluster number
+        :param percent_boot: percentage for which composite is significant
+        """
+        self.logger.info("Plot composites")
         for prec in self.precs_sections:
             self._create_dataset_from_composites(self.config[prec]["name"], k)
             n_rows1 = min(k, 4)
@@ -291,8 +342,6 @@ class Composites:
                     ax.gridlines(color="Gray", linestyle="dotted", linewidth=0.5)
                     if self.cut_area:
                         ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-
-
                     self._calculate_significance(ip, k, self.config[prec]["name"], percent_boot)
                     ax.set_title(f"Composite {ip}, p = {self.percent_boot:3f}", fontsize=10)
                     plt.rcParams['hatch.linewidth'] = 0.03  # previous pdf hatch linewidth
@@ -311,7 +360,14 @@ class Composites:
             plt.savefig(f"{self.directory_plots}/composites.pdf")
             plt.close()
 
-    def plot_years(self, predictand, method_name, k, f):
+    def plot_years(self, predictand: str, method_name: str, k: int, f: np.ndarray):
+        """
+        Plot composites for all years
+        :param predictand: name of predictand/ cluster for saving in the correct folder
+        :param f: list containing the cluster number for each state
+        :param k: cluster number
+        :param method_name: name of method used to calculate clusters (e.g. ward)
+        """
         for prec in self.precs_sections:
             self._set_directory_plots(
                 f"output//{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/years/plots/")
@@ -355,7 +411,7 @@ class Composites:
                 # ax.contourf(self.lons, self.lats, significance, levels=[0., 0.05, 0.5, 0.95, 1],
                 #             hatches=["/////", ".....", None, None, None], colors='none', transform=ccrs.PlateCarree())
                 # # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
-                logger.debug(
+                self.logger.debug(
                     f"Save in {self.directory_plots}/{self.var}_{self.dict_precursors[self.var].time.values[year]}.pdf")
                 plt.savefig(
                     f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
@@ -365,7 +421,14 @@ class Composites:
                     f".png")
                 plt.close()
 
-    def time_plot(self, predictand, method_name, k, f):
+    def time_plot(self, predictand: str, method_name: str, k: int, f: np.ndarray):
+        """
+        Plot mean var for each time point
+        :param predictand: name of predictand/ cluster for saving in the correct folder
+        :param f: list containing the cluster number for each state
+        :param k: cluster number
+        :param method_name: name of method used to calculate clusters (e.g. ward)
+        """
         for prec in self.precs_sections:
             self.var = f"{self.config[prec]['name']}"
             self._set_directory_plots(
@@ -395,14 +458,18 @@ class Composites:
             # Set y-axis label
             plt.ylabel(f"mean {self.var}")
             fig_sns = sns_plot.get_figure()
-            logger.debug(f"Save in {self.directory_plots}/{self.var}_time_plot.pdf")
+            self.logger.debug(f"Save in {self.directory_plots}/{self.var}_time_plot.pdf")
             fig_sns.savefig(f"{self.directory_plots}/{self.var}_time_plot.pdf")
             fig_sns.savefig(f"{self.directory_plots}/{self.var}_time_plot.png")
             plt.close()
 
-    def _create_dataset_from_composites(self, key, k):
-        """ create dataset for clusters as netcdf using xarray library"""
-        logger.info("Create dataset with composites as variables")
+    def _create_dataset_from_composites(self, key: str, k: int):
+        """
+        create dataset for clusters as netcdf using xarray library
+        :param key: name of precursor
+        :param k: cluster number
+        """
+        self.logger.info("Create dataset with composites as variables")
         self._set_composites_reshape(key, k)
         self.data_vars = {}
         for ik in range(k):
@@ -412,8 +479,12 @@ class Composites:
         self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_precursors[key].coords["lon"].values,
                                                      'lat': self.dict_precursors[key].coords["lat"].values})
 
-    def _set_composites_reshape(self, key, k):
-        """ reshape 1d clusterst to 2d clusters"""
+    def _set_composites_reshape(self, key: str, k: int):
+        """
+        reshape 1d clusterst to 2d clusters
+        :param key: name of precursor
+        :param k: cluster number
+        """
         self.composites_reshape[key] = np.zeros(
             (k, self.dict_precursors[key].shape[1],
              self.dict_precursors[key].shape[2]))
@@ -423,44 +494,63 @@ class Composites:
                            (self.dict_precursors[key].shape[1],
                             self.dict_precursors[key].shape[2]))
 
-    def save_composites(self, k):
-        """ save clusters using xarray"""
-        logger.info("Save composites as netcdf")
+    def save_composites(self, k: int):
+        """
+        save clusters using xarray
+        :param k: cluster number
+        """
+        self.logger.info("Save composites as netcdf")
         for prec in self.precs_sections:
             self._create_dataset_from_composites(self.config[prec]["name"], k)
             self.ds.to_netcdf(f"{self.directory_files}/composites_{self.config[prec]['name']}_{k}.nc")
 
-    def _set_directory_plots(self, directory):
-        """ set directories for plots"""
+    def _set_directory_plots(self, directory: str):
+        """
+        set directories for plots
+        :param directory: path for plot directory
+        """
         self.directory_plots = directory
 
-    def _set_directory_files(self, directory):
-        """ set directory for files"""
+    def _set_directory_files(self, directory: str):
+        """
+        set directories for plots
+        :param directory: path for files directory
+        """
         self.directory_files = directory
 
-    def _calculate_significance(self, ik, k, key, percent_boot):
+    def _calculate_significance(self, ik: int, k: int, key: str, percent_boot: int):
         """calculate significance of composite using the bootstrap method
         Composite [key][ik]
-        ik - index of the k-th composite
-        k - total composites number of composites key
-        key - dictionary key of composite
-        percent_boot - significance of significance level percent_boot
+        :param ik: index of the k-th composite
+        :param k: total composites number of composites key
+        :param key: dictionary key of composite
+        :param percent_boot: significance of significance level percent_boot
         """
         # initialize variables
         self.initialize_variables_for_significance(key, ik, k, percent_boot)
         # call bootstrap method
         self._bootstrap_method(key, ik)
 
-    def set_lats_and_lons(self, key, ik):
-        """ get longittudes and latitudes for bootstrap method"""
+    def set_lats_and_lons(self, key: str, ik: int):
+        """
+        get longittudes and latitudes for bootstrap method
+        :param ik: index of the k-th composite
+        :param key: dictionary key of composite
+        """
         self.lons, self.lats = np.meshgrid(self.dict_precursors[key].coords['lon'].values,
                                            self.dict_precursors[key].coords['lat'].values)
         self.lats1 = np.reshape(self.lons, [self.dict_composites[key][ik].shape[0], -1])
         self.lons1 = np.reshape(self.lats, [self.dict_composites[key][ik].shape[0], -1])
 
-    def initialize_variables_for_significance(self, key, ik, k, percent_boot):
-        """ initialize variables for bootstrap method"""
-        logger.info(f"Calculate Significance {k}, Significance level {percent_boot}")
+    def initialize_variables_for_significance(self, key: str, ik: int, k: int, percent_boot: int):
+        """
+        initialize variables for bootstrap method
+        :param key: dictionary key of composite
+        :param ik: index of the k-th composite
+        :param k: total composites number of composites key
+        :param percent_boot: significance of significance level percent_boot
+        """
+        self.logger.info(f"Calculate Significance {k}, Significance level {percent_boot}")
         self.composites_significance[key] = np.zeros((k, self.dict_composites[key][ik].shape[0]))
         # Calculate end_n different randomly selected clusters to see whether our cluster is significant
         self.percent_boot = percent_boot
@@ -471,8 +561,12 @@ class Composites:
         # initialize array for randomly selected clusters
         self.bootstrap_arrays = np.zeros((self.end_n, self.dict_standardized_precursors[key].shape[1]))
 
-    def _bootstrap_method(self, key, ik):
-        """ calculate significance according to bootstrap method"""
+    def _bootstrap_method(self, key: str, ik: int):
+        """
+        calculate significance according to bootstrap method
+        :param key: dictionary key of composite
+        :param ik: index of the k-th composite
+        """
         for t in range(self.end_n):
             # choose random time states, but no duplicate states
             chosen_time_steps = np.random.choice(self.time_dim, self.cluster_frequency[ik], replace=False)
@@ -493,34 +587,5 @@ class Composites:
                 self.percent_boot = i_sig / len_alpha * self.percent_boot
                 break
         # self.percent_boot = percent_boot
-        logger.debug(f"Winner is {self.percent_boot}")
+        self.logger.debug(f"Winner is {self.percent_boot}")
 
-if __name__ == '__main__':
-
-    # import libraries
-    import matplotlib.pyplot as plt
-
-    # Used variables
-    inifile = "/home/sonja/Documents/Clustering-forecast/clustering_forecast.ini"
-    # https://docs.python.org/3/library/configparser.html
-    config = configparser.ConfigParser()
-    config.read(inifile)
-
-    precs = Composites(inifile)
-    number_precs = len(precs.dict_precursors)
-
-    # plot data
-    n_cols = 4
-    n_rows = 2
-    # fig, axes = plt.subplots(ncols=n_cols, figsize=(20,20))
-    fig, axes = plt.subplots(ncols=n_cols, nrows=n_rows, figsize=(25, 20))
-    precs_sections = [prec for prec in config.sections() if 'PREC' in prec]
-    for i in range(n_rows):
-        for j in range(n_cols):
-            if (j + n_cols * i) < number_precs:
-                (precs.dict_precursors[config[precs_sections[j + n_cols * i]]["name"]]
-                 [config[precs_sections[j + n_cols * i]]["var"]].isel(time=0).plot(ax=axes[i, j]))
-            # precs.dict_precursors[config[precs_sections[i]]["name"]].info()
-
-    plt.savefig(f"output/precursors.pdf")
-    precs.reshape_precursors_to_1d()

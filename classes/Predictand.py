@@ -19,15 +19,13 @@ import cftime
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 from mpl_toolkits.basemap import Basemap
 from logging import config
-from config_dict import config
+import configparser
 from pathlib import Path
 from sklearn.preprocessing import normalize
 import pickle
 
 sns.set()
 
-logging.config.dictConfig(config)
-logger = logging.getLogger(__name__)
 
 
 def _fancy_dendrogram(*args, **kwargs):
@@ -59,14 +57,19 @@ def _fancy_dendrogram(*args, **kwargs):
 class Predictand:
     """ Class to analyze Predictand """
 
-    def __init__(self, inifile_in, output_label):
+    def __init__(self, inifile_in: str, output_label: str, cl_config: dict):
         """
         Initialize Clusters--> read file(s) using ini-file
         apply mask, if necessary
         extract data such as time and spatial data
         create 1d array
+        :param inifile_in: file for initialization of variable
+        :param output_label: label for substring of output directory
+        :param cl_config: dictionary, where all information of logger is stored from classes/config
         """
-        logger.info('Read ini-file')
+        logging.config.dictConfig(cl_config)
+        self.logger = logging.getLogger(__name__)
+        self.logger.info('Read ini-file')
         self.inifile = inifile_in
         # https://docs.python.org/3/library/configparser.html
         self.config = configparser.ConfigParser()
@@ -74,7 +77,7 @@ class Predictand:
         self.dict_standardized_pred_rmse = {}
         self.output_label = output_label
 
-        logger.debug(f"Sections: {[prec for prec in self.config.sections() if 'PRED:' in prec]}")
+        self.logger.debug(f"Sections: {[prec for prec in self.config.sections() if 'PRED:' in prec]}")
         self.sec = [prec for prec in self.config.sections() if 'PRED:' in prec][0]
         self.var = self.config[self.sec]["var"]
         # all precursors in the ini-file should be assigned to the dictionary
@@ -99,7 +102,7 @@ class Predictand:
                 self.list_of_files = sorted(self.list_of_files)
                 length_files = len(self.list_of_files)
                 for i in range(length_files):
-                    logger.debug(f"file {i}: {self.list_of_files[i]}")
+                    self.logger.debug(f"file {i}: {self.list_of_files[i]}")
                     self.dict_predict[f"{self.var}_{i}"] = xr.open_dataset(self.list_of_files[i])[self.var]
                     self._set_extent_cluster(f"{self.var}_{i}")
                     if self.config.has_option(self.sec, "mask"):
@@ -123,13 +126,15 @@ class Predictand:
                 self.dict_standardized_pred_1D = {self.var: np.concatenate(list(self.dict_standardized_pred_1D
                                                                                 .values()))}
         else:
-            logger.error(f"Option {self.var} and/or section {self.sec} not found in ini-file {self.inifile}")
+            self.logger.error(f"Option {self.var} and/or section {self.sec} not found in ini-file {self.inifile}")
             raise NameError()
 
-    def _set_extent_cluster(self, label):
+    def _set_extent_cluster(self, label: str):
         """
          Get Longitudes and Latitudes, check whether latitudes go form -90 to 90 or from 90 to -90,
         if the letter, reverse order
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
         """
         #  first read whether unit is lat or latitude or something else
         #  https://stackoverflow.com/questions/29135885/netcdf4-extract-for-subset-of-lat-lon
@@ -171,7 +176,11 @@ class Predictand:
         self.Z_dict = None
 
     def _get_dim_boundaries(self, label):
-        """ get dimensions of latitudes and longitudes from ini-file"""
+        """
+        get dimensions of latitudes and longitudes from ini-file
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        """
         self.lat_min, self.lat_max, self.lon_min, self.lon_max = map(float,
                                                                                     self.config[self.sec]["coords"]
                                                                                     .split(','))
@@ -183,8 +192,12 @@ class Predictand:
         else:
             self.time_start_file = pd.to_datetime(self.dict_predict[label].time.values[0]).year
 
-    def _get_and_apply_mask(self, label):
-        """apply mask to input-file"""
+    def _get_and_apply_mask(self, label: str):
+        """
+        apply mask to input-file
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        """
         self.dict_mask[self.config[self.sec]["var"]] = np.loadtxt(self.config[self.sec]["mask"])
         self.dict_predict[label] = self.dict_predict[label] \
             .where(self.dict_mask[self.config[self.sec]["var"]] == 0, 0)
@@ -192,18 +205,25 @@ class Predictand:
     def _transform_to_1d_and_remove_nans(self, label):
         """ transfrom array and set values 0, where no data is found as well reshape to 1D"""
         # self.dict_pred_1D[var] = 1
-        logger.info('Reshape to 1D array and remove nans')
+        self.logger.info('Reshape to 1D array and remove nans')
         self.dict_pred_1D[label] = np.reshape(np.array(self.dict_predict[label]),
                                               [np.array(self.dict_predict[label])
                                               .shape[0], -1])
         self.dict_pred_1D[label][self.dict_pred_1D[label] != self.dict_pred_1D[label]] = 0
 
-    def _set_method_name(self, method_name):
-        """ set method """
+    def _set_method_name(self, method_name: str):
+        """
+        set method
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        """
         self.method_name = method_name
 
-    def _set_k(self, k):
-        """ set k"""
+    def _set_k(self, k: int):
+        """
+        set k
+        :param k: number of clusters
+        """
         self.k = k
 
     def _set_linkage(self):
@@ -223,15 +243,23 @@ class Predictand:
             self.f[nr] = self.f_final[f_el]
 
     def _set_directory_plots(self, directory):
-        """ set directories for plots"""
+        """
+        set directories for plots
+        :param directory: directory for images
+        """
         self.directory_plots = directory
 
     def _set_directory_files(self, directory):
-        """ set directory for files"""
+        """
+        set directory for files
+        :param directory: directory for images
+        """
         self.directory_files = directory
 
     def _set_clusters_1d(self):
         """ set 1d clusters from f"""
+        if not isinstance(self.dict_standardized_pred_1D[self.var], np.ndarray):
+            self.dict_standardized_pred_1D[self.var] = np.array(self.dict_standardized_pred_1D[self.var])
         self.clusters = np.zeros((self.k, self.dict_standardized_pred_1D[self.var].shape[1]))
         for cluster_number in range(self.k):
             self.clusters[cluster_number] = \
@@ -247,6 +275,11 @@ class Predictand:
                                                    self.dict_predict[self.var].shape[2]))
 
     def _calculate_standardized_predictand(self, label):
+        """
+        calculate the standardized predictand
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        """
         self.varmean = np.mean(self.dict_pred_1D[label], axis=0)
         self.varAnom = self.dict_pred_1D[label] - self.varmean
         # divided by grid (1d-Array) and years - 1 (the year which we would like to forecast)
@@ -257,10 +290,15 @@ class Predictand:
         else:
             self.dict_standardized_pred_1D[label] = self.varAnom
 
-    def calculate_clusters_train_test(self, train_data, method_name, k):
-        """calculate clusters for predictand variable"""
-        logger.info('Calculate clusters')
-        self.dict_standardized_pred_1D = train_data
+    def calculate_clusters_from_test_data(self, train_data: list, method_name: str, k: int):
+        """
+        calculate clusters for predictand variable
+        :param train_data: cluster data which should be used to calculate clusters
+        :param method_name: name of the method used for clustering
+        :param k: number of clusters
+        """
+        self.logger.info('Calculate clusters')
+        self.dict_standardized_pred_1D = (train_data)
         self._set_method_name(method_name)
         self._set_k(k)
         self._set_linkage()
@@ -282,7 +320,7 @@ class Predictand:
         self.cluster_frequency = np.bincount(self.f)
         self.cluster_frequency = np.divide(self.cluster_frequency, float(self.dict_predict[self.var].shape[0]))*100
         for j in range(self.k):
-            logger.info(f"Cluster{j}, {self.cluster_frequency[j]:.3f}")
+            self.logger.info(f"Cluster{j}, {self.cluster_frequency[j]:.3f}")
         self.cluster_frequency_sort = np.argsort(np.argsort(self.cluster_frequency))
         self.cluster_bin = np.bincount(self.f)
 
@@ -294,11 +332,12 @@ class Predictand:
         i = 0
         for key, item in self.dict_clusters_d.items():
             self.Z_dict[key] = linkage(self.dict_clusters_d[key], self.method_name)
-            logger.debug(f"self.Z_dict[{key}], {self.cluster_bin[i]}")
-            logger.debug(self.Z_dict[key][-2:])
+            self.logger.debug(f"self.Z_dict[{key}], {self.cluster_bin[i]}")
+            self.logger.debug(self.Z_dict[key][-2:])
             i = i + 1
 
     def plot_years(self):
+        """ plot years of predictand"""
         self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
         self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/")
@@ -333,7 +372,7 @@ class Predictand:
             # ax.contourf(self.lons, self.lats, significance, levels=[0., 0.05, 0.5, 0.95, 1],
             #             hatches=["/////", ".....", None, None, None], colors='none', transform=ccrs.PlateCarree())
             # # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
-            logger.debug(f"Save in {self.directory_plots}/{self.var}_{self.dict_predict[self.var].time.values[year]}"
+            self.logger.debug(f"Save in {self.directory_plots}/{self.var}_{self.dict_predict[self.var].time.values[year]}"
                          f".pdf")
             plt.savefig(f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_predict[self.var].time.values[year]}"
                         f".pdf")
@@ -341,6 +380,7 @@ class Predictand:
             plt.close()
 
     def time_plot(self):
+        """ plot all time points of mean predictand"""
         self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
         self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
@@ -366,7 +406,7 @@ class Predictand:
         # Set y-axis label
         plt.ylabel("mean temperature")
         fig_sns = sns_plot.get_figure()
-        logger.debug(f"Save in {self.directory_plots}/{self.var}_time_plot.pdf")
+        self.logger.debug(f"Save in {self.directory_plots}/{self.var}_time_plot.pdf")
         fig_sns.savefig(f"{self.directory_plots}/{self.var}_time_plot.pdf")
         fig_sns.savefig(f"{self.directory_plots}/{self.var}_time_plot.png")
         plt.close()
@@ -404,7 +444,7 @@ class Predictand:
                 title = self.cluster_frequency[ip]
                 ax.set_title(f"Cluster {ip} - {title:4.2f} %", fontsize=10)
 
-        logger.debug(f"Save in {self.directory_plots}/clusters.pdf")
+        self.logger.debug(f"Save in {self.directory_plots}/clusters.pdf")
         plt.savefig(f"{self.directory_plots}/clusters.pdf")
         plt.close()
 
@@ -440,6 +480,7 @@ class Predictand:
         #            fmt='%4.2f', delimiter=".")  # x,y,z equal sized 1D arrays
 
     def _save_timeseries_f(self):
+        """ save and plot f as pdf and pickle file respectively"""
         time_data = [self.time_start_file + float(i)
                      for i in range(int(self.dict_standardized_pred_1D[self.var].shape[0]))]
         pickle.dump(np.hstack((time_data, self.f)).astype(float),
@@ -501,7 +542,7 @@ class Predictand:
 
     def _create_dataset_from_clusters(self):
         """ create dataset for clusters as netcdf using xarray library"""
-        logger.info("create dataset with clusters as variables")
+        self.logger.info("create dataset with clusters as variables")
         self.data_vars = {}
         for i in range(self.k):
             # cs = int(self.k) - int(self.clustersnumber_save[i]) - 1
@@ -512,11 +553,14 @@ class Predictand:
 
     def save_clusters(self):
         """ save clusters using xarray"""
-        logger.info("Save clusters as netcdf")
+        self.logger.info("Save clusters as netcdf")
         self._create_dataset_from_clusters()
         self.ds.to_netcdf(f"{self.directory_files}/clusters.nc")
 
     def calculate_rms(self):
+        """
+        Save root mean square error plot
+        """
         self._calculate_standardized_predictand(self.var)
         self.dict_standardized_pred_rmse = np.zeros(self.dict_standardized_pred_1D[self.var].shape[1])
         for ci in range(self.dict_standardized_pred_1D[self.var].shape[1]):
@@ -550,17 +594,18 @@ class Predictand:
         # set directories for plots and files
         self._set_directory_plots(f"output/{self.var}/Cluster/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        logger.debug(f"Save in {self.directory_plots}/rms.pdf")
+        self.logger.debug(f"Save in {self.directory_plots}/rms.pdf")
         plt.savefig(f"{self.directory_plots}/rms.pdf")
         plt.close()
 
-    def calculate_clusters_year(self, method_name, k, year):
+    def calculate_clusters_year(self, method_name: str, k: int, year: int):
         """
         calculate clusters for predictand variable
-        :type method_name: basestring
-        :type k: int
+        :param method_name: name of method used to calculate clusters (e.g. ward)\
+        :param k: cluster number
+        :param year: year for which we would like to forecast the predictand
         """
-        logger.info('Calculate clusters')
+        self.logger.info('Calculate clusters')
         self.remove_year_and_calc_anomalies(year)
         self._set_method_name(method_name)
         self._set_k(k)
@@ -577,10 +622,11 @@ class Predictand:
         # calculate frequency
         # self._states_of_each_cluster()
 
-    def remove_year_and_calc_anomalies(self, year):
+    def remove_year_and_calc_anomalies(self, year : int):
         """
         remove selected year
-        :type year: int
+        :param year: year for which we would like to forecast the predictand and remove in this case from
+        the training data set
         """
         self.dict_pred_1D[f"{self.var}_minus_year_1D"] = np.delete(self.dict_pred_1D[f"{self.var}"], year - int(self.time_start_file), axis=0)
         self.varmean = np.mean(self.dict_pred_1D[f"{self.var}_minus_year_1D"], axis=0)
@@ -591,14 +637,3 @@ class Predictand:
         self.dict_standardized_pred_1D[self.var] = self.varAnom  # / self.sigma_var
         del self.varmean
         del self.varAnom
-
-if __name__ == '__main__':
-    # Used variables
-    inifile = "/home/sonja/Documents/Clustering-forecast/clustering_forecast_prec_t.ini"
-    # initialize predictand
-    clusters = Predictand(inifile)
-    # plot data
-    fig, axes = plt.subplots(ncols=2, figsize=(20, 8))
-    clusters.dict_predict[clusters.var].isel(time=0).plot(ax=axes[0])
-    clusters.dict_predict[f"{clusters.var}_copy"].isel(time=0).plot(ax=axes[1])
-    plt.savefig(f"output/{clusters.sec}_{clusters.var}.pdf")

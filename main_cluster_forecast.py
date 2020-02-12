@@ -10,38 +10,36 @@ from classes.Precursors import Precursors
 from classes.Predictand import Predictand
 from classes.Forecast import Forecast
 from classes.ExportVarPlot import ExportVarPlot
-import sys
 from scipy import stats
-
-
+from classes.ClusteringParser import ClusteringParser
+from classes.Config import Config
 # usage TS ini/composites_America_ICEFRAC.ini ICEFRAC prec_t 6009 99
 
-def main():
+
+def main(cl_parser: ClusteringParser, cl_config: dict):
     logger.info("Start forecast model")
 
     # load inifile according to variable
-    var = sys.argv[1]
-    inifile = f"ini/clusters_America_{var}.ini"
-    predictand = Predictand(inifile)
-
+    inifile = cl_parser.arguments['inifile']
+    predictand = Predictand(inifile, cl_parser.arguments['outlabel'])
     # load forecast-parameters
     method_name = 'ward'
     k = 6
-    forecast = Forecast(inifile, k, method_name)
+    forecast = Forecast(inifile, cl_config, k, method_name)
     logger.info("Clusters: " + str(forecast.k))
     diff = int(forecast.end_year) - int(forecast.beg_year)
     forecast_data = np.zeros((diff, predictand.dict_pred_1D[f"{predictand.var}"].shape[1]))
     pattern_corr_values = []
 
     # load precursors
-    precursors = Precursors(inifile)
+    precursors = Precursors(inifile, cl_config)
     all_precs_names = [x for x in precursors.dict_precursors.keys()]
 
     # Calculate forecast for all years
     for year in range(int(forecast.beg_year), int(forecast.beg_year) + 3):  # int(forecast.end_year)
 
         # Calculate clusters of precursors for var, by removing one year
-        predictand.calculate_clusters(forecast.method_name, forecast.k, year - forecast.beg_year)
+        predictand.calculate_clusters_year(forecast.method_name, forecast.k, year - forecast.beg_year)
 
         # Calculate composites
         precursors.get_composites_data_1d(year - forecast.beg_year, predictand.f, forecast.k, forecast.method_name,
@@ -66,7 +64,7 @@ def main():
 
     # Reshape correlation maps
     pred_t_corr_reshape = np.reshape(time_correlation, (predictand.dict_predict[predictand.var].shape[1],
-                                                                      predictand.dict_predict[predictand.var].shape[2]))
+                                                        predictand.dict_predict[predictand.var].shape[2]))
     significance_corr_reshape = np.reshape(significance, (predictand.dict_predict[predictand.var].shape[1],
                                                           predictand.dict_predict[predictand.var].shape[2]))
 
@@ -76,16 +74,20 @@ def main():
     # Plot correlation map, if specified in ini-file
     if forecast.plot:
         logger.info("Plot and save variables")
-        ex = ExportVarPlot()
+        ex = ExportVarPlot(cl_config)
         ex.save_plot_and_time_correlation(forecast.list_precursors, predictand, pred_t_corr_reshape,
                                           significance_corr_reshape, all_precs_names)
 
 
 if __name__ == '__main__':
     import logging.config
-    from config_dict import config
-
+    parser = ClusteringParser()
+    # logs / log_
+    # {sys.argv[2]}.log
+    config = Config(parser.arguments['logfile'])
     logger = logging.getLogger(__name__)
-    logging.config.dictConfig(config)
+
+    # read config log file from classes.Config
+    logging.config.dictConfig(config.config_dict)
     logger.info("Start clustering program")
-    main()
+    main(parser, config.config_dict)

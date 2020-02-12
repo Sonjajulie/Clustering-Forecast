@@ -16,5 +16,5 @@ source /etc/profile.d/modules.csh
 module load python/3.6.8
 ncar_pylib my_npl_clone_casper
 
-python3 main_cluster.py $var ${var}_log $output_label
+python3 main_cluster.py --predictand $var --logfile logs/log_${var}.log  --outputfile $output_label
 

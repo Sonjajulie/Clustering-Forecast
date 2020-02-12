@@ -15,17 +15,24 @@ import xarray as xr
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from pathlib import Path
-
+from classes.Predictand import Predictand
+import numpy as np
 sns.set()
 
-logger = logging.getLogger(__name__)
 
 
 class ExportVarPlot:
     """save variables and plot data"""
 
-    def __init__(self):
-        """ initialize class"""
+    def __init__(self, cl_config: dict):
+        """
+        initialize class
+        :param cl_config: dictionary, where all information of logger is stored from classes/config
+        """
+        logging.config.dictConfig(cl_config)
+        self.logger = logging.getLogger(__name__)
+        self.logger.info('Read ini-file')
+
         self.cmap1 = plt.cm.get_cmap('seismic', 51)
         self.orig_cmap = plt.cm.get_cmap('seismic', 51)
         self.lons = None
@@ -44,9 +51,15 @@ class ExportVarPlot:
         self.directory_plots = None
         self.directory_files = None
 
-    def _create_dataset_from_var(self, variable, pred_t, significance):
-        """ create dataset for clusters as netcdf using xarray library"""
-        logger.info("create dataset for variable")
+    def _create_dataset_from_var(self, variable: str, pred_t: Predictand, significance: np.ndarray):
+        """
+        create dataset for clusters as netcdf using xarray library
+        :param variable: variable, which should be plotted ( usually correlation 2d array
+        of forecast and observation)
+        :param pred_t: object of class Predictand, where the forecast and significance shall be plotted
+        :param significance: 2d array of which point of the correlation are significant
+        """
+        self.logger.info("create dataset for variable")
         self.data_vars = {f"{pred_t.var}-skill": xr.DataArray(variable, dims=('lat', 'lon')),
                           f"{pred_t.var}-significance": xr.DataArray(significance, dims=('lat', 'lon')),
                           }
@@ -56,14 +69,30 @@ class ExportVarPlot:
         self.lat_min, self.lat_max = min(self.lats), max(self.lats)
         self.ds = xr.Dataset(self.data_vars, coords={'lon': self.lons, 'lat': self.lats})
 
-    def _save_variable(self, variable, pred_t, name, significance):
-        """ save clusters using xarray"""
-        logger.info("Save variable as netcdf")
+    def _save_variable(self, variable: str, pred_t: Predictand, name: str, significance: np.ndarray):
+        """
+        save clusters using xarray
+        :param variable: variable, which should be plotted ( usually correlation 2d array
+        of forecast and observation)
+        :param pred_t: object of class Predictand, where the forecast and significance shall be plotted
+        :param pred_t_corr_reshape: correlation 2d array of forecast and observation
+        :param name: name of the precuror
+        :param significance: 2d array of which point of the correlation are significant
+        """
+        self.logger.info("Save variable as netcdf")
         self._create_dataset_from_var(variable, pred_t, significance)
         self.ds.to_netcdf(f'{self.directory_files}/variable_{name}.nc')
 
-    def _save_skill_plot(self, variable, pred_t, name, significance):
-        """ save clusters into one plot using xarray library"""
+    def _save_skill_plot(self, variable: str, pred_t: Predictand, name: str, significance: np.ndarray):
+        """
+        save clusters into one plot using xarray library
+        :param variable: variable, which should be plotted ( usually correlation 2d array
+        of forecast and observation)
+        :param pred_t: object of class Predictand, where the forecast and significance shall be plotted
+        :param pred_t_corr_reshape: correlation 2d array of forecast and observation
+        :param name: name of the precuror
+        :param significance: 2d array of which point of the correlation are significant
+        """
         self._save_variable(variable, pred_t, name, significance)
         # n_cols = max(n, 1)
         map_proj = ccrs.PlateCarree()
@@ -87,16 +116,24 @@ class ExportVarPlot:
         ax.contourf(self.lons, self.lats, significance, levels=[ 0.,0.05, 0.5, 0.95, 1],
                     hatches=["/////", ".....", None, None, None], colors='none', transform=ccrs.PlateCarree())
                     # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
-        logger.debug(f"Save in {self.directory_plots}/{pred_t.var}_skill.pdf")
+        self.logger.debug(f"Save in {self.directory_plots}/{pred_t.var}_skill.pdf")
         plt.savefig(f"{self.directory_plots}/{pred_t.var}_skill.pdf")
         plt.close()
 
-    def save_plot_and_time_correlation(self, list_precursors, pred_t, pred_t_corr_reshape, significance,
-                                       all_precs_names):
-        """ call functions to save and plot data"""
+    def save_plot_and_time_correlation(self, list_precursors: list, pred_t: Predictand,
+                                       pred_t_corr_reshape: np.ndarray, significance: np.ndarray,
+                                       all_precs_names: list):
+        """
+        call functions to save and plot data
+        :param list_precursors: list of precursors which should be plotted
+        :param pred_t: object of class Predictand, where the forecast and significance shall be plotted
+        :param pred_t_corr_reshape: correlation 2d array of forecast and observation
+        :param significance: 2d array of which point of the correlation are significant
+        :param all_precs_names: all possible precursors names
+        """
         # define outputname
         if len(list_precursors) == 1:
-            self.save_string = all_precs_names[list_precursors[0]]
+            self.save_string = list_precursors[0]  # all_precs_names[list_precursors[0]]
         else:
             s = "-"
             self.save_string = s.join(list_precursors)

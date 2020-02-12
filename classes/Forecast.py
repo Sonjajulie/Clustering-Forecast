@@ -7,23 +7,26 @@ Created on Tue Dec 10 16:11:43 2019
 """
 from logging import config
 import logging
-from config_dict import config
 import numpy as np
 import ast
 import configparser
 from scipy import stats
 from itertools import combinations
-logging.config.dictConfig(config)
-logger = logging.getLogger(__name__)
+
 
 
 class Forecast:
-    def __init__(self, inifile_in, k=8, method_name="ward"):
+    def __init__(self, inifile_in: str, cl_config: dict, k=8, method_name="ward"):
         """
         Initialize Forecast--> read forecast parameters using ini-file
-        :type inifile_in: basestring
+        :param inifile_in: file for initialization of variable
+        :param cl_config: dictionary, where all information of logger is stored from classes/config
+        :param k: number of clusters
+        :param method_name: method for clustering data
         """
-        logger.info('Read ini-file')
+        logging.config.dictConfig(cl_config)
+        self.logger = logging.getLogger(__name__)
+        self.logger.info('Read ini-file')
         self.inifile = inifile_in
         # initialize data
         self.alpha_all = None
@@ -33,15 +36,15 @@ class Forecast:
         self.t_corr_arr = None
         self.t_corr_signif_arr = None
         self.list_precursors_all = []
-        self.list_precursors = []
+
         # initialize list of possible precursors according to k and method_name
         self._get_forecast_parameters(k, method_name)
 
-    def _get_forecast_parameters(self, k, method_name):
+    def _get_forecast_parameters(self, k: int, method_name: str):
         """
         load all forecast parameters and save composites which should be saved
-        :type k: int
-        :type method_name: string
+        :param k: number of clusters
+        :param method_name: method for clustering data
         """
         self.method_name = method_name
         self.k = k
@@ -54,23 +57,27 @@ class Forecast:
         self.end_year = int(self.config["Forecast-Parameters"]["end"])
         self.diff = self.end_year - self.beg_year
         assert self.diff > 0, \
-            logger.error(f"end year of forecast must be greater than start year! It is {self.end_year}")
+            self.logger.error(f"end year of forecast must be greater than start year! It is {self.end_year}")
         self.end_year = self.config["Forecast-Parameters"]["end"]
         # Select from saveArray which precursors should be used to calculate forecast
         # self.list_precursors = ast.literal_eval(config.get("Forecast-Parameters", "forecastprecs"))
         self.list_precursors_all = ast.literal_eval(self.config.get("Forecast-Parameters", "forecastprecs"))
         self.plot = self.config["Forecast-Parameters"]["plot"]
         self.all_combinations = self.config["Forecast-Parameters"]["all_combinattions"]
+        self.list_precursors_combinations = []
         if self.all_combinations:
             for r in range(len(self.list_precursors_all)):
-                self.list_precursors.append(list(combinations(self.list_precursors_all, r)))
+                [self.list_precursors_combinations
+                     .append(list(x)) for x in combinations(self.list_precursors_all, r + 1)]
+        else:
+            self.list_precursors = self.list_precursors_all
 
-    def prediction_train_test(self, clusters_1d, composites_1d, X_test, year):
+    def prediction_train_test(self, clusters_1d: dict, composites_1d: dict, X_test: np.ndarray, year):
         """make forecast
-        :type clusters_1d: dict of clusters
-        :type composites_1d: dict of compostes
-        :type data_year_1d: dict of precursors
-        :type year: int
+        :param clusters_1d: dict of all k-clusters
+        :param composites_1d: dict of composites with time and one-dimensional array
+        :param X_test: np.ndarray with all the train data of precursors
+        :param year: year which should be forecasted
         """
         # Merge only those precursors which were selected
         self.selected_composites_1D, self.selected_data_1d = self._merge_selected_precursors(composites_1d,
@@ -85,17 +92,17 @@ class Forecast:
             self.forecast_var += self.alpha_all[i] * clusters_1d[int(i)]
 
         return self.forecast_var
-    def prediction(self, clusters_1d, composites_1d, data_year_1d, year):
+
+    def prediction(self, clusters_1d: dict, composites_1d: dict, data_year_1d: np.ndarray, year: int):
         """make forecast
-        :type clusters_1d: dict of clusters
-        :type composites_1d: dict of compostes
-        :type data_year_1d: dict of precursors
-        :type year: int
+        :param clusters_1d: dict of all k-clusters
+        :param composites_1d: dict of composites with time and one-dimensional array
+        :param data_year_1d: np.ndarray with all  data of precursors
+        :param year: year which should be forecasted
         """
         # Merge only those precursors which were selected
         self.selected_composites_1D, self.selected_data_1d = self._merge_selected_precursors(composites_1d,
                                                                                              data_year_1d, year)
-
         # Calculate projection coefficients
         self.alpha_matrix = np.zeros((self.k, self.k))
         self.alpha_all = self._projection_coefficients()
@@ -103,13 +110,13 @@ class Forecast:
         self.forecast_var = np.zeros(len(clusters_1d[0]))
         for i in range(int(self.k)):
             self.forecast_var += self.alpha_all[i] * clusters_1d[int(i)]
-
         return self.forecast_var
 
-    def _merge_selected_precursors(self, composites_1d, data_1d, year):
+    def _merge_selected_precursors(self, composites_1d: dict, data_1d: dict, year: int):
         """  Merge only those precursors which were selected
-        :type composites_1d: dict of composites
-        :type data_1d: dict of precursor data for specified year
+        :param composites_1d: dictionary of all k-composites
+        :param data_1d: dictionary of precursor data for specified year
+        :param year: year for which predictand should be forecasted
         """
         return (np.hstack([composites_1d[i] for i in self.list_precursors]),
                 np.hstack([data_1d[i][year] for i in self.list_precursors]))
@@ -133,10 +140,10 @@ class Forecast:
 
         return np.dot(self.pinv_matrix, rhs)
 
-    def calculate_time_correlation(self, data_1d, forecast_data, time_start_file):
+    def calculate_time_correlation(self, data_1d: list, forecast_data: np.ndarray, time_start_file: int):
         """calculate time correlation for given forecast data
-        :param forecast_data: list
-        :param data_1d: 2d array of float
+        :param forecast_data: list of forecasted data
+        :param data_1d: list of obervational data which shoud be forecasted
         :type time_start_file: int
         """
         self.t_corr_arr = np.zeros((forecast_data.shape[1]))
