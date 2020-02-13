@@ -388,11 +388,14 @@ class Clusters:
             # ax.contourf(self.lons, self.lats, significance, levels=[0., 0.05, 0.5, 0.95, 1],
             #             hatches=["/////", ".....", None, None, None], colors='none', transform=ccrs.PlateCarree())
             # # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
-            self.logger.debug(f"Save in {self.directory_plots}/{self.var}_{self.dict_predict[self.var].time.values[year]}"
-                         f".pdf")
-            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_{self.var}_{self.dict_predict[self.var].time.values[year]}"
+            self.logger.debug(f"{directories_plots[self.f[year]]}/{year:03d}_"
+                              f"{self.dict_predict[self.var].time.values[year]}.png")
+
+            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_{self.var}_"
+                        f"{self.dict_predict[self.var].time.values[year]}"
                         f".pdf")
-            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_{self.dict_predict[self.var].time.values[year]}.png")
+            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_"
+                        f"{self.dict_predict[self.var].time.values[year]}.png")
             plt.close()
 
     def time_plot(self):
