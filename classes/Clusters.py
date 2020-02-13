@@ -387,9 +387,9 @@ class Clusters:
             # # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
             self.logger.debug(f"Save in {self.directory_plots}/{self.var}_{self.dict_predict[self.var].time.values[year]}"
                          f".pdf")
-            plt.savefig(f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_predict[self.var].time.values[year]}"
+            plt.savefig(f"{self.directory_plots}/Cluster_{self.f[year]}/{year:03d}_{self.var}_{self.dict_predict[self.var].time.values[year]}"
                         f".pdf")
-            plt.savefig(f"{self.directory_plots}/{year:03d}_{self.dict_predict[self.var].time.values[year]}.png")
+            plt.savefig(f"{self.directory_plots}/Cluster_{self.f[year]}/{year:03d}_{self.dict_predict[self.var].time.values[year]}.png")
             plt.close()
 
     def time_plot(self):
