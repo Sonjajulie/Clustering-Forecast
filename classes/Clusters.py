@@ -351,10 +351,11 @@ class Clusters:
         """
         Plot each year of variable
         """
-        self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/")
-        Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/")
-        Path(self.directory_files).mkdir(parents=True, exist_ok=True)
+        for i in range(self.k):
+            self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/Cluster_{i}/plots/")
+            Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
+            self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/Cluster_{self.f[year]}/files/")
+            Path(self.directory_files).mkdir(parents=True, exist_ok=True)
         for year in range(len(self.dict_standardized_pred_1D[self.var])):
             var_reshape = np.reshape(self.dict_pred_1D[self.var][year], (self.dict_predict[self.var].shape[1],
                                                                          self.dict_predict[self.var].shape[2]))
