@@ -315,8 +315,16 @@ class Composites:
             n_rows1 = min(k, 4)
             n_cols1 = np.ceil(k / n_rows1)
             if self.var == "ICEFRAC" or self.var == "FSNO":
+                # for significance plotting --> ice and snow should be also
+                # plotted for 95 %
+                hatches_ = ["/////", "...", None, None, "...", "/////", None]
+                levels_ = [0, self.percent_boot, self.percent_boot + 4, 50,
+                           100 - self.percent_boot - 4, 100 - self.percent_boot, 100],
                 if k == 5 or k == 7:
                     n_cols1 = 1
+            else:
+                hatches_ = ["/////", None, None, "/////", None]
+                levels_ = [0, self.percent_boot, 50, 100 - self.percent_boot, 100]
             # n_cols1 = max(n, 1)
             map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(), ccrs.LambertConformal(),
                                  ccrs.Orthographic(0, 90)]
@@ -350,13 +358,10 @@ class Composites:
                                 np.reshape(self.composites_significance[self.config[prec]["name"]][ip],
                                            (self.dict_precursors[self.config[prec]["name"]].shape[1],
                                             self.dict_precursors[self.config[prec]["name"]].shape[2])),
-                                # levels=[0, 100 - percent_boot, 50, percent_boot, 100],
-                                levels=[0, self.percent_boot, 50, 100 - self.percent_boot, 100],
-                                hatches=["/////", None, None, "/////", None], colors='none',
+                                levels=levels_,
+                                hatches=hatches_, colors='none',
                                 transform=ccrs.PlateCarree())  # alpha=0.0,
-                    # levels = [0, 100 - percent_boot, 100 - percent_boot + 4, 50,
-                    # percent_boot - 4, percent_boot, 100],
-                    # hatches = ["/////", "...", None, None, "...", "/////", None], colors = 'none',
+
             plt.savefig(f"{self.directory_plots}/composites.pdf")
             plt.close()
 
@@ -401,16 +406,9 @@ class Composites:
                 ax.coastlines()
                 if self.cut_area:
                     ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-                # Without this aspect attributes the maps will look chaotic and the
-                # "extent" attribute above will be ignored
-                # ax.set_aspect("equal")
-                # aspect = self.aspect,  # 2,  # 1.5
                 ax.set_aspect(self.aspect)
                 ax.set_title(f"{self.var}, {self.dict_precursors[self.var].time.values[year]}, cluster: "
                              f"{f[year]}", fontsize=10)
-                # ax.contourf(self.lons, self.lats, significance, levels=[0., 0.05, 0.5, 0.95, 1],
-                #             hatches=["/////", ".....", None, None, None], colors='none', transform=ccrs.PlateCarree())
-                # # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
                 self.logger.debug(
                     f"Save in {self.directory_plots}/{self.var}_{self.dict_precursors[self.var].time.values[year]}.pdf")
                 plt.savefig(
@@ -579,13 +577,16 @@ class Composites:
             self.composites_significance[key][ik][ci] = stats.percentileofscore(xyt_array, comp_val)
             if self.composites_significance[key][ik][ci] > 0:
                 alphas.append(self.composites_significance[key][ik][ci])
-        alphas = sorted(alphas)
-        len_alpha = len(alphas)
-        for i_sig in range(1, len_alpha + 1):
-            if (alphas[len_alpha - 1 - i_sig] < 100 - (i_sig / len_alpha * self.percent_boot)) \
-                    or (alphas[i_sig] > i_sig / len_alpha * self.percent_boot):
-                self.percent_boot = i_sig / len_alpha * self.percent_boot
-                break
-        # self.percent_boot = percent_boot
-        self.logger.debug(f"Winner is {self.percent_boot}")
+        # new mechanism to calculate signigicance but does not work as expected
+        # that's why it is set to wrong (Wilks et al. (2016))
+        if False:
+            alphas = sorted(alphas)
+            len_alpha = len(alphas)
+            for i_sig in range(1, len_alpha + 1):
+                if (alphas[len_alpha - 1 - i_sig] < 100 - (i_sig / len_alpha * self.percent_boot)) \
+                        or (alphas[i_sig] > i_sig / len_alpha * self.percent_boot):
+                    self.percent_boot = i_sig / len_alpha * self.percent_boot
+                    break
+            # self.percent_boot = percent_boot
+            self.logger.debug(f"Winner is {self.percent_boot}")
 
