@@ -42,7 +42,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
         predictand.calculate_clusters_year(forecast.method_name, forecast.k, year - forecast.beg_year)
 
         # Calculate composites
-        precursors.get_composites_data_1d(year - forecast.beg_year, predictand.f, forecast.k, forecast.method_name,
+        precursors.get_composites_data_1d_year(year - forecast.beg_year, predictand.f, forecast.k, forecast.method_name,
                                           predictand.var)
 
         # Prediction
