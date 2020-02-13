@@ -392,7 +392,7 @@ class Clusters:
                          f".pdf")
             plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_{self.var}_{self.dict_predict[self.var].time.values[year]}"
                         f".pdf")
-            plt.savefig(f"{directories_plots[self.f[year]]}/Cluster_{self.f[year]}/{year:03d}_{self.dict_predict[self.var].time.values[year]}.png")
+            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_{self.dict_predict[self.var].time.values[year]}.png")
             plt.close()
 
     def time_plot(self):
