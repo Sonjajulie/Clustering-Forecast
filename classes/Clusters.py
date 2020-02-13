@@ -351,11 +351,13 @@ class Clusters:
         """
         Plot each year of variable
         """
+        directories_plots = {}
+        directories_files = {}
         for i in range(self.k):
-            self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/Cluster_{i}/plots/")
-            Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-            self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/Cluster_{i}/files/")
-            Path(self.directory_files).mkdir(parents=True, exist_ok=True)
+            directories_plots[i] = (f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/Cluster_{i}/")
+            Path(directories_plots[i]).mkdir(parents=True, exist_ok=True)
+            directories_files[i] = (f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/Cluster_{i}/")
+            Path(directories_files[i]).mkdir(parents=True, exist_ok=True)
         for year in range(len(self.dict_standardized_pred_1D[self.var])):
             var_reshape = np.reshape(self.dict_pred_1D[self.var][year], (self.dict_predict[self.var].shape[1],
                                                                          self.dict_predict[self.var].shape[2]))
@@ -388,9 +390,9 @@ class Clusters:
             # # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
             self.logger.debug(f"Save in {self.directory_plots}/{self.var}_{self.dict_predict[self.var].time.values[year]}"
                          f".pdf")
-            plt.savefig(f"{self.directory_plots}/Cluster_{self.f[year]}/{year:03d}_{self.var}_{self.dict_predict[self.var].time.values[year]}"
+            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_{self.var}_{self.dict_predict[self.var].time.values[year]}"
                         f".pdf")
-            plt.savefig(f"{self.directory_plots}/Cluster_{self.f[year]}/{year:03d}_{self.dict_predict[self.var].time.values[year]}.png")
+            plt.savefig(f"{directories_plots[self.f[year]]}/Cluster_{self.f[year]}/{year:03d}_{self.dict_predict[self.var].time.values[year]}.png")
             plt.close()
 
     def time_plot(self):
