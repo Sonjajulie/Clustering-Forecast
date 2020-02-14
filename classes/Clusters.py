@@ -351,20 +351,29 @@ class Clusters:
         """
         Plot each year of variable
         """
+        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/")
+        Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
+        
+        # path for each cluster
         directories_plots = {}
         directories_files = {}
         for i in range(self.k):
-            directories_plots[i] = (f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/Cluster_{i}/")
+            directories_plots[i] = (f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/Cluster_{i}/")
             Path(directories_plots[i]).mkdir(parents=True, exist_ok=True)
-            directories_files[i] = (f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/Cluster_{i}/")
+            directories_files[i] = (f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/Cluster_{i}/")
             Path(directories_files[i]).mkdir(parents=True, exist_ok=True)
         for year in range(len(self.dict_standardized_pred_1D[self.var])):
-            var_reshape = np.reshape(self.dict_pred_1D[self.var][year], (self.dict_predict[self.var].shape[1],
+            var_reshape = np.reshape(self.dict_standardized_pred_1D[self.var][year], (self.dict_predict[self.var].shape[1],
                                                                          self.dict_predict[self.var].shape[2]))
             self.data_vars[f"{self.var}"] = xr.DataArray(var_reshape, dims=('lat', 'lon'))
             # (( 'lat','lon'), self.clusters_reshape[i])
             self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_predict[self.var].coords["lon"].values,
-                                                         'lat': self.dict_predict[self.var].coords["lat"].values})
+                                                         'lat': self.dict_predict[self.var].coords["lat"].values},
+                                                 attrs={'long_name': self.dict_predict[self.var].coords["long_name"].values,
+                                                    'units': self.dict_predict[self.var].coords["units"].values
+                                             }
+                                                         
+                                                         )
             # n_cols = max(n, 1)
             map_proj = ccrs.PlateCarree()
             self.ds_arrays = self.ds[f"{self.var}"]
@@ -385,9 +394,6 @@ class Clusters:
             ax.set_aspect(aspect=self.ds.dims["lon"] / self.ds.dims["lat"])
             ax.set_title(f"{self.var}, {self.dict_predict[self.var].time.values[year]}, cluster: {self.f[year]}",
                          fontsize=10)
-            # ax.contourf(self.lons, self.lats, significance, levels=[0., 0.05, 0.5, 0.95, 1],
-            #             hatches=["/////", ".....", None, None, None], colors='none', transform=ccrs.PlateCarree())
-            # # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
             self.logger.debug(f"{directories_plots[self.f[year]]}/{year:03d}_"
                               f"{self.dict_predict[self.var].time.values[year]}.png")
 
@@ -396,15 +402,17 @@ class Clusters:
                         f".pdf")
             plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_"
                         f"{self.dict_predict[self.var].time.values[year]}.png")
+            plt.savefig(f"{self.directory_plots}/{year:03d}_"
+                        f"{self.dict_predict[self.var].time.values[year]}.png")
             plt.close()
 
     def time_plot(self):
         """
         Plot variable for each model and each time point as mean
         """
-        self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
+        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
+        self._set_directory_files(f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
         time1 = self.dict_predict[self.var].coords["time"].values
         time = [i for i in range(len(time1))]
@@ -493,7 +501,7 @@ class Clusters:
         sns.set_style()
         plt.plot(time_data, clust_data, 'o', linestyle='-')
         plt.close()
-        fig5.savefig(f"{self.directory_plots}timeSeries_{self.method_name}_{self.k}.pdf")
+        fig5.savefig(f"{self.directory_plots}/timeSeries_{self.method_name}_{self.k}.pdf")
         # use pickle since savetxt gives warning
         pickle.dump(np.hstack((time_data, clust_data)).astype(float),
                     open(f"{self.directory_files}/timeSeries_{self.method_name}_{self.k}.txt", "wb"))
@@ -580,7 +588,11 @@ class Clusters:
             self.data_vars[f"cluster_{self.var}_{i}"] = xr.DataArray(self.clusters_reshape[i], dims=('lat', 'lon'))
             # (( 'lat','lon'), self.clusters_reshape[i])
         self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_predict[self.var].coords["lon"].values,
-                                                     'lat': self.dict_predict[self.var].coords["lat"].values})
+                                                     'lat': self.dict_predict[self.var].coords["lat"].values},
+                                             attrs={'long_name': self.dict_predict[self.var].coords["long_name"].values,
+                                                    'units': self.dict_predict[self.var].coords["units"].values
+                                             }
+                                                     )
 
     def save_clusters(self):
         """

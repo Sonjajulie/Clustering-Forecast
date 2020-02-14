@@ -28,14 +28,14 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # pred_clusters = Clusters(f"ini/clusters_America_TS.ini")
     method_name = 'ward'
 
-    # for k in [3, 4, 5, 6, 7, 8, 9]:
-    for k in [3]:
+    # ~ for k in [3, 4, 5, 6, 7, 8, 9]:
+    for k in [5]:
         pred_clusters.calculate_clusters(method_name, k)
         pred_clusters.plot_clusters_and_time_series()
         pred_clusters.plot_elbow_plot()
         pred_clusters.plot_fancy_dendrogram()
         pred_clusters.save_clusters()
-        # pred_clusters.plot_years()
+        pred_clusters.plot_years()
 
 
 if __name__ == '__main__':
