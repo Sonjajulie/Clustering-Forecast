@@ -24,7 +24,8 @@ import cartopy.feature as cfeature
 import cartopy.crs as ccrs
 from scipy import stats
 import pandas as pd
-
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import matplotlib.ticker as mticker
 # from xscale import signal
 # seed the pseudorandom number generator
 
@@ -132,6 +133,10 @@ class Composites:
                                                                .coords[self.label_lon].values,
                                                                        'lat': self.dict_precursors[f"{self.var}_{0}"]
                                                                .coords[self.label_lat].values},
+                                                               attrs={'long_name': self.dict_precursors[f"{self.var}_{0}"]
+                                                               .attrs["long_name"],
+                                                                      'units': self.dict_precursors[f"{self.var}_{0}"]
+                                                               .attrs["units"]},
                                                                dims=['time', self.label_lat, self.label_lon])}
                 self.dict_standardized_precursors = {self.var: np.concatenate(list(
                     self.dict_standardized_precursors.values()))}
@@ -194,7 +199,7 @@ class Composites:
     def _transform_to_1d_and_remove_nans(self, label: str):
         """
         :param label: name of variable. If one uses a cluster the variable name is the same for different
-        model initialization and therefore I renamed the variable name.
+        model initialization and therefore I renamed the variable name to label.
         """
         """ transfrom array and set values 0, where no data is found as well reshape to 1D"""
         self.logger.info('Reshape to 1D array and remove nans')
@@ -295,7 +300,7 @@ class Composites:
         self._set_directory_files(f"output-{self.output_label}//{predictand}/Composites/{key}/{method_name}_Composite_{k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
 
-    def plot_composites(self, k: int, percent_boot: int):
+    def plot_composites(self, k: int, percent_boot: float):
         """
         Plot clusters
         :param k: cluster number
@@ -303,12 +308,13 @@ class Composites:
         """
         self._save_composites_plot(k, percent_boot)
 
-    def _save_composites_plot(self, k: int, percent_boot: int):
+    def _save_composites_plot(self, k: int, percent_boot: float):
         """
         save clusters into one plot using xarray library
         :param k: cluster number
         :param percent_boot: percentage for which composite is significant
         """
+        self.percent_boot = percent_boot
         self.logger.info("Plot composites")
         for prec in self.precs_sections:
             self._create_dataset_from_composites(self.config[prec]["name"], k)
@@ -329,9 +335,17 @@ class Composites:
             map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(), ccrs.LambertConformal(),
                                  ccrs.Orthographic(0, 90)]
             map_project = map_project_array[self.map_proj_nr]
-            self.ds_arrays = self.ds.to_array()
-            p = self.ds_arrays.plot(transform=ccrs.PlateCarree(),
-                                    col='variable',
+            lsize = 14
+            axislsize = 9
+            plt.rc("legend", frameon=False, fontsize=lsize)
+            plt.rc("axes", labelsize=lsize, titlesize=lsize)
+            plt.rc("xtick", labelsize=lsize)
+            plt.rc("ytick", labelsize=lsize)
+            plt.rc("lines", linewidth=0.5)
+            plt.rc("figure", dpi=100)
+
+            p = self.data_vars[f"composite{self.var}"].plot(transform=ccrs.PlateCarree(),
+                                    col='c',
                                     col_wrap=int(n_cols1),
                                     cmap=plt.cm.get_cmap('seismic', 31),
                                     subplot_kws={'projection': map_project},
@@ -341,8 +355,9 @@ class Composites:
                                     # cbar_kwargs={'shrink': 0.8, 'pad':0.02},
                                     )
 
-            p.fig.subplots_adjust(hspace=0.1, wspace=0.1)
-            p.add_colorbar(orientation="vertical")
+            p.fig.subplots_adjust(hspace=0.2, wspace=0.15)
+            p.add_colorbar(orientation='vertical', label=f"{self.dict_precursors[self.var].attrs['long_name']} [{self.dict_precursors[self.var].attrs['units']}]", shrink=0.8,
+                           pad=0.02)
             for ip, ax in enumerate(p.axes.flat):
                 if ip < k:
                     ax.add_feature(cfeature.BORDERS, linewidth=0.1)
@@ -350,17 +365,31 @@ class Composites:
                     ax.gridlines(color="Gray", linestyle="dotted", linewidth=0.5)
                     if self.cut_area:
                         ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-                    self._calculate_significance(ip, k, self.config[prec]["name"], percent_boot)
-                    ax.set_title(f"Composite {ip}, p = {self.percent_boot:3f}", fontsize=10)
-                    plt.rcParams['hatch.linewidth'] = 0.03  # previous pdf hatch linewidth
-                    plt.rcParams['hatch.color'] = 'k'  # previous pdf hatch linewidth
-                    ax.contourf(self.lons, self.lats,
-                                np.reshape(self.composites_significance[self.config[prec]["name"]][ip],
-                                           (self.dict_precursors[self.config[prec]["name"]].shape[1],
-                                            self.dict_precursors[self.config[prec]["name"]].shape[2])),
-                                levels=levels_,
-                                hatches=hatches_, colors='none',
-                                transform=ccrs.PlateCarree())  # alpha=0.0,
+                    # self._calculate_significance(ip, k, self.config[prec]["name"], percent_boot)
+                    title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
+                    ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} %", fontsize=lsize)
+                    plt.rcParams['hatch.linewidth'] = 0.03  # hatch linewidth
+                    plt.rcParams['hatch.color'] = 'k'  # hatch color --> black
+                    # ax.contourf(self.lons, self.lats,
+                    #             np.reshape(self.composites_significance[self.config[prec]["name"]][ip],
+                    #                        (self.dict_precursors[self.config[prec]["name"]].shape[1],
+                    #                         self.dict_precursors[self.config[prec]["name"]].shape[2])),
+                    #             levels=levels_,
+                    #             hatches=hatches_, colors='none',
+                    #             transform=ccrs.PlateCarree())  # alpha=0.0,
+                    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                                      linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
+                    gl.xlabels_top = False
+                    gl.ylabels_right = False
+                    gl.xformatter = LONGITUDE_FORMATTER
+                    gl.yformatter = LATITUDE_FORMATTER
+                    gl.xlabel_style = {'size': axislsize, 'color': 'black'}
+                    gl.ylabel_style = {'size': axislsize, 'color': 'black'}
+                    gl.xlocator = mticker.FixedLocator([i for i in range(-180,190,30)])
+                    gl.ylocator = mticker.FixedLocator([i for i in range(-100,100,20)])
+                    # Without this aspect attributes the maps will look chaotic and the
+                    # "extent" attribute above will be ignored
+                    # ax.set_aspect("equal")
 
             plt.savefig(f"{self.directory_plots}/composites.pdf")
             plt.close()
@@ -469,13 +498,25 @@ class Composites:
         """
         self.logger.info("Create dataset with composites as variables")
         self._set_composites_reshape(key, k)
+        # self.data_vars = {}
+        # for ik in range(k):
+        #     self.data_vars[f"composites_{key}_{ik}"] = \
+        #         (xr.DataArray((self.composites_reshape[key][ik]), dims=('lat', 'lon')))
+        #     # (( 'lat','lon'), self.clusters_reshape[ik])
+        # self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_precursors[key].coords["lon"].values,
+        #                                              'lat': self.dict_precursors[key].coords["lat"].values})
+
         self.data_vars = {}
-        for ik in range(k):
-            self.data_vars[f"composites_{key}_{ik}"] = \
-                (xr.DataArray((self.composites_reshape[key][ik]), dims=('lat', 'lon')))
-            # (( 'lat','lon'), self.clusters_reshape[ik])
-        self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_precursors[key].coords["lon"].values,
-                                                     'lat': self.dict_precursors[key].coords["lat"].values})
+        self.lons, self.lats = np.meshgrid(self.dict_precursors[self.var].coords['lon'].values,
+                                           self.dict_precursors[self.var].coords['lat'].values)
+        self.data_vars = {}
+        self.data_vars[f"composite{self.var}"] = xr.DataArray(self.composites_reshape[key],
+                                                             coords={
+                                                                     'lon': self.dict_precursors[self.var].coords['lon'].values,
+                                                                 'lat': self.dict_precursors[self.var].coords['lat'].values},
+                                                             attrs={'long_name': self.dict_precursors[self.var] .attrs["long_name"],
+                                                                    'units': self.dict_precursors[self.var].attrs["units"]},
+                                                             dims=['c', 'lat', 'lon'])
 
     def _set_composites_reshape(self, key: str, k: int):
         """
@@ -500,7 +541,7 @@ class Composites:
         self.logger.info("Save composites as netcdf")
         for prec in self.precs_sections:
             self._create_dataset_from_composites(self.config[prec]["name"], k)
-            self.ds.to_netcdf(f"{self.directory_files}/composites_{self.config[prec]['name']}_{k}.nc")
+            self.data_vars[f"composite{self.var}"].to_netcdf(f"{self.directory_files}/composites_{self.config[prec]['name']}_{k}.nc")
 
     def _set_directory_plots(self, directory: str):
         """

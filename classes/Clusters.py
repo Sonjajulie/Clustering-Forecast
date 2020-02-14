@@ -25,7 +25,8 @@ from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 from logging import config
 from pathlib import Path
 import pickle
-
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import matplotlib.ticker as mticker
 sns.set()
 
 
@@ -117,12 +118,22 @@ class Clusters:
                 #                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
                 list_time_model = [f"model {i + 1}, date: {j.year}-{j.month}-{j.day}" for i in range(length_files)
                                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
+                coords_old = self.dict_predict[f"{self.var}_{0}"].coords
+                attrs_old = self.dict_predict[f"{self.var}_{0}"].attrs
+
                 self.dict_predict = {self.var: xr.DataArray(np.concatenate(list(self.dict_predict.values())),
                                                             coords={'time': list_time_model,
                                                                     'lon': self.dict_predict[f"{self.var}_{0}"]
                                                             .coords['lon'].values, 'lat': self.
                                                             dict_predict[f"{self.var}_{0}"]
-                                                            .coords['lat'].values}, dims=['time', 'lat', 'lon'])}
+                                                            .coords['lat'].values},
+                                                             attrs = {'long_name': self.dict_predict[f"{self.var}_{0}"]
+                                                            .attrs["long_name"],
+                                                            'units': self.dict_predict[f"{self.var}_{0}"]
+                                                            .attrs["units"]},
+                                                            dims=['time', 'lat', 'lon'])}
+
+
                 self.dict_pred_1D = {self.var: np.concatenate(list(self.dict_pred_1D.values()))}
                 self.dict_standardized_pred_1D = {self.var: np.concatenate(list(self.dict_standardized_pred_1D
                                                                                 .values()))}
@@ -432,43 +443,6 @@ class Clusters:
         fig_sns.savefig(f"{self.directory_plots}/{self.var}_time_plot.png")
         plt.close()
 
-    def _save_clusters_plot(self):
-        """ Save clusters into one plot using xarray library"""
-        # self._set_clustersnumber_save()
-        self._create_dataset_from_clusters()
-
-        n_cols = min(self.k, 4)
-        n_cols = np.ceil(self.k / n_cols)
-        # n_cols = max(n, 1)
-        map_proj = ccrs.PlateCarree()
-        self.ds_arrays = self.ds.to_array()
-
-        p = self.ds_arrays.plot(
-            transform=ccrs.PlateCarree(),  # the data's projection
-            col="variable",
-            cmap=plt.cm.get_cmap('seismic', 31),
-            size=2,
-            col_wrap=int(n_cols),  # multiplot settings
-            aspect=self.ds.dims["lon"] / self.ds.dims["lat"],  # for a sensible figsize
-            subplot_kws={"projection": map_proj},  # the plot's projection
-        )
-
-        # We have to set the map's options on all four axes
-        for ip, ax in enumerate(p.axes.flat):
-            if ip < self.k:
-                ax.add_feature(cfeature.BORDERS, linewidth=0.1)
-                ax.coastlines()
-                ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-                # Without this aspect attributes the maps will look chaotic and the
-                # "extent" attribute above will be ignored
-                # ax.set_aspect("equal")
-                title = self.cluster_frequency[ip]
-                ax.set_title(f"Cluster {ip} - {title:4.2f} %", fontsize=10)
-
-        self.logger.debug(f"Save in {self.directory_plots}/clusters.pdf")
-        plt.savefig(f"{self.directory_plots}/clusters.pdf")
-        plt.close()
-
     def plot_clusters_and_time_series(self):
         """Plot clusters"""
         # self._save_separate_clusters()
@@ -569,18 +543,88 @@ class Clusters:
         fig1.savefig(f"{self.directory_plots}/Dendrogram_{self.method_name}.pdf")
         plt.close()
 
+    def _save_clusters_plot(self):
+        """ Save clusters into one plot using xarray library"""
+        # self._set_clustersnumber_save()
+        self._create_dataset_from_clusters()
+
+        n_cols = min(self.k, 4)
+        n_cols = np.ceil(self.k / n_cols)
+        # n_cols = max(n, 1)
+        map_proj = ccrs.PlateCarree()
+        # self.data_vars[f"cluster_{self.var}"]
+        lsize = 14
+        axislsize = 10
+        plt.rc("legend", frameon=False, fontsize=lsize)
+        plt.rc("axes", labelsize=lsize, titlesize=lsize)
+        plt.rc("xtick", labelsize=lsize)
+        plt.rc("ytick", labelsize=lsize)
+        plt.rc("lines", linewidth=0.5)
+        plt.rc("figure", dpi=100)
+
+        p = self.data_vars[f"cluster_{self.var}"].plot(
+            transform=ccrs.PlateCarree(),  # the data's projection
+            col="c",
+            cmap=plt.cm.get_cmap('seismic', 31),
+            size=5,
+            aspect=2,
+            col_wrap=int(n_cols),  # multiplot settings
+            # aspect=len(self.lats ) / len(self.lons),  # for a sensible figsize
+            subplot_kws={"projection": map_proj},  # the plot's projection
+            add_colorbar=False,
+            # cbar_kwargs={'shrink': 0.8, 'pad': 0.02, "label": f"[{self.dict_predict[self.var].attrs['units']}]"},
+        )
+        p.fig.subplots_adjust(hspace=0.01, wspace=0.1)
+        # p.fig.subplots_adjust(hspace=0.5)
+        # kwargs={'orientation':'vertical','shrink': 0.8, 'pad': 0.02, "label": f"[{self.dict_predict[self.var].attrs['units']}]"}
+        p.add_colorbar(orientation='vertical', label=f"{self.dict_predict[self.var].attrs['long_name']} "
+                                                     f"[{self.dict_predict[self.var].attrs['units']}]",
+                       shrink=0.8, pad=0.02)
+
+        # p.fig.ax.set_ylabel(f"[{self.dict_predict[self.var].attrs['units']}]")
+        # # We have to set the map's options on all four axes
+        for ip, ax in enumerate(p.axes.flat):
+            if ip < self.k:
+                ax.add_feature(cfeature.BORDERS, linewidth=0.1)
+                ax.coastlines()
+                ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
+
+                gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                                  linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
+                gl.xlabels_top = False
+                gl.ylabels_right = False
+                gl.xformatter = LONGITUDE_FORMATTER
+                gl.yformatter = LATITUDE_FORMATTER
+                gl.xlabel_style = {'size': axislsize, 'color': 'black'}
+                gl.ylabel_style = {'size': axislsize, 'color': 'black'}
+                gl.xlocator = mticker.FixedLocator([i for i in range(-180,-0,30)])
+                gl.ylocator = mticker.FixedLocator([i for i in range(10,100,20)])
+                # Without this aspect attributes the maps will look chaotic and the
+                # "extent" attribute above will be ignored
+                # ax.set_aspect("equal")
+                title = self.cluster_frequency[ip]
+                ax.set_title(f"Cluster {ip} - {title:4.2f} %", fontsize=lsize)
+
+        self.logger.debug(f"Save in {self.directory_plots}/clusters.pdf")
+        plt.savefig(f"{self.directory_plots}/clusters.pdf")
+        plt.close()
+
     def _create_dataset_from_clusters(self):
         """
         Create dataset for clusters as netcdf using xarray library
         """
         self.logger.info("create dataset with clusters as variables")
         self.data_vars = {}
-        for i in range(self.k):
-            # cs = int(self.k) - int(self.clustersnumber_save[i]) - 1
-            self.data_vars[f"cluster_{self.var}_{i}"] = xr.DataArray(self.clusters_reshape[i], dims=('lat', 'lon'))
-            # (( 'lat','lon'), self.clusters_reshape[i])
-        self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_predict[self.var].coords["lon"].values,
-                                                     'lat': self.dict_predict[self.var].coords["lat"].values})
+        self.lons, self.lats = np.meshgrid(self.dict_predict[self.var].coords['lon'].values,
+                                           self.dict_predict[self.var].coords['lat'].values)
+        self.data_vars = {}
+        self.data_vars[f"cluster_{self.var}"] = xr.DataArray(self.clusters_reshape,
+                                                             coords={
+                                                                     'lon': self.dict_predict[self.var].coords['lon'].values,
+                                                                 'lat': self.dict_predict[self.var].coords['lat'].values},
+                                                             attrs={'long_name': self.dict_predict[self.var] .attrs["long_name"],
+                                                                    'units': self.dict_predict[self.var].attrs["units"]},
+                                                             dims=['c', 'lat', 'lon'])
 
     def save_clusters(self):
         """
@@ -588,7 +632,7 @@ class Clusters:
         """
         self.logger.info("Save clusters as netcdf")
         self._create_dataset_from_clusters()
-        self.ds.to_netcdf(f"{self.directory_files}/clusters.nc")
+        self.data_vars[f"cluster_{self.var}"].to_netcdf(f"{self.directory_files}/clusters.nc")
 
     def calculate_rms(self):
         """
@@ -612,7 +656,7 @@ class Clusters:
         p = self.ds_arrays.plot(
             cmap=plt.cm.get_cmap('seismic', 31),
             size=5,
-            aspect=self.ds.dims["lon"] / self.ds.dims["lat"],  # for a sensible figsize
+            aspect=self.ds.dims["y"] / self.ds.dims["x"],  # for a sensible figsize
         )
 
         # We have to set the map's options on all four axes
