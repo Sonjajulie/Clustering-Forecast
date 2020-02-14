@@ -1,4 +1,6 @@
 *.nc
 *.log
-*.error
+*.err
 *.out
+*.pyc
+
