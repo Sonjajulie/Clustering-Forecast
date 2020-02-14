@@ -413,18 +413,29 @@ class Composites:
                 var_reshape = np.reshape(self.dict_standardized_precursors[self.config[prec]["name"]][year],
                                          (self.dict_precursors[self.config[prec]["name"]].shape[1],
                                           self.dict_precursors[self.config[prec]["name"]].shape[2]))
-                self.data_vars[f"{self.config[prec]['name']}"] = xr.DataArray(var_reshape, dims=('lat', 'lon'))
-                # (( 'lat','lon'), self.clusters_reshape[i])
-                self.ds = xr.Dataset(self.data_vars, coords={
-                    'lon': self.dict_precursors[self.config[prec]['name']].coords["lon"].values,
-                    'lat': self.dict_precursors[self.config[prec]['name']].coords["lat"].values})
+
+                self.lons, self.lats = np.meshgrid(self.dict_precursors[self.var].coords['lon'].values,
+                                                   self.dict_precursors[self.var].coords['lat'].values)
+
+                self.data_vars = {}
+                self.data_vars[f"{self.config[prec]['name']}"]  = xr.DataArray(var_reshape,
+                                          coords={
+                                                  'lon': self.dict_precursors[self.var].coords[
+                                                         'lon'].values,
+                                                  'lat': self.dict_precursors[self.var].coords[
+                                                         'lat'].values},
+                                          attrs={
+                                                  'long_name': self.dict_precursors[self.var].attrs[
+                                                               "long_name"],
+                                                  'units': self.dict_precursors[self.var].attrs["units"]},
+                                          dims=['lat', 'lon'])
+
                 # n_cols = max(n, 1)
                 map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(), ccrs.LambertConformal(),
                                      ccrs.Orthographic(0, 90)]
                 map_project = map_project_array[self.map_proj_nr]
-                self.ds_arrays = self.ds[f"{self.config[prec]['name']}"]
                 ax = plt.axes(projection=map_project)
-                self.ds[f"{self.config[prec]['name']}"].plot(
+                self.data_vars[f"{self.config[prec]['name']}"].plot(
                     ax=ax,
                     transform=ccrs.PlateCarree(),  # the data's projection
                     cmap=plt.cm.get_cmap('seismic', 31),
