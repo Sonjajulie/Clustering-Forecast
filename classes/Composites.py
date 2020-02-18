@@ -373,9 +373,10 @@ class Composites:
                     self._calculate_significance(ip, k, self.var, percent_boot)
                     title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
                     if self.var == "ICEFRAC" or self.var == "FSNO":
-                        ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} % / {(self.percent_boot + 5):3.2f} %", fontsize=lsize)
+                        lsize = 10
+                        ax.set_title(f"Composite {ip} ({title:4.2f}%), p = {self.percent_boot:3.2f} % / {(self.percent_boot + 4):3.2f} %", fontsize=lsize)
                     else:
-                        ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} %", fontsize=lsize)
+                        ax.set_title(f"Composite {ip} ({title:4.2f}%), p = {self.percent_boot:3.2f} %", fontsize=lsize)
                     plt.rcParams['hatch.linewidth'] = 0.03  # hatch linewidth
                     plt.rcParams['hatch.color'] = 'k'  # hatch color --> black
                     ax.contourf(self.lons, self.lats,
