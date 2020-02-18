@@ -63,7 +63,7 @@ class Forecast:
         # self.list_precursors = ast.literal_eval(config.get("Forecast-Parameters", "forecastprecs"))
         self.list_precursors_all = ast.literal_eval(self.config.get("Forecast-Parameters", "forecastprecs"))
         self.plot = self.config["Forecast-Parameters"]["plot"]
-        self.all_combinations = self.config["Forecast-Parameters"]["all_combinattions"]
+        self.all_combinations = self.config["Forecast-Parameters"]["all_combinations"]
         self.list_precursors_combinations = []
         if self.all_combinations:
             for r in range(len(self.list_precursors_all)):
@@ -140,7 +140,7 @@ class Forecast:
 
         return np.dot(self.pinv_matrix, rhs)
 
-    def calculate_time_correlation(self, data_1d: list, forecast_data: np.ndarray, time_start_file: int):
+    def calculate_time_correlation(self, data_1d: np.ndarray, forecast_data: np.ndarray, time_start_file: int):
         """calculate time correlation for given forecast data
         :param forecast_data: list of forecasted data
         :param data_1d: list of obervational data which shoud be forecasted
@@ -148,9 +148,10 @@ class Forecast:
         """
         self.t_corr_arr = np.zeros((forecast_data.shape[1]))
         self.t_corr_signif_arr = np.zeros((forecast_data.shape[1]))
+        start_obs = int(self.beg_year) - time_start_file + 1
+        end_end= int(self.end_year) - time_start_file + 1
         for i in range(forecast_data.shape[1]):
-            t_corr = stats.pearsonr(forecast_data[0:self.diff, i], data_1d[int(self.beg_year) - time_start_file:int(
-                self.end_year) - time_start_file, i])
+            t_corr = stats.pearsonr(forecast_data[0:self.diff, i], data_1d[start_obs:end_end, i])
             self.t_corr_arr[i] = t_corr[0]
             # if t_corr[1] > 0.05:
             #     self.t_corr_signif_arr[i] = self.t_corr_arr[i]

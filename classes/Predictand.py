@@ -5,6 +5,14 @@ Created on Tue Dec 10 16:11:43 2019
 
 @author: sonja
 """
+
+import os
+import matplotlib as mpl
+# if I do not use this trick, no plots will be saved!
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -23,7 +31,8 @@ import configparser
 from pathlib import Path
 from sklearn.preprocessing import normalize
 import pickle
-
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import matplotlib.ticker as mticker
 sns.set()
 
 
@@ -57,13 +66,14 @@ def _fancy_dendrogram(*args, **kwargs):
 class Predictand:
     """ Class to analyze Predictand """
 
-    def __init__(self, inifile_in: str, output_label: str, cl_config: dict):
+    def __init__(self, inifile_in: str, output_path: str, output_label: str, cl_config: dict):
         """
         Initialize Clusters--> read file(s) using ini-file
         apply mask, if necessary
         extract data such as time and spatial data
         create 1d array
         :param inifile_in: file for initialization of variable
+        :param output_path: path, where output should be saved
         :param output_label: label for substring of output directory
         :param cl_config: dictionary, where all information of logger is stored from classes/config
         """
@@ -75,8 +85,8 @@ class Predictand:
         self.config = configparser.ConfigParser()
         self.config.read(self.inifile)
         self.dict_standardized_pred_rmse = {}
+        self.output_path = output_path
         self.output_label = output_label
-
         self.logger.debug(f"Sections: {[prec for prec in self.config.sections() if 'PRED:' in prec]}")
         self.sec = [prec for prec in self.config.sections() if 'PRED:' in prec][0]
         self.var = self.config[self.sec]["var"]
@@ -116,12 +126,18 @@ class Predictand:
                 #                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
                 list_time_model = [f"model {i + 1}, date: {j.year}-{j.month}-{j.day}" for i in range(length_files)
                                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
+
                 self.dict_predict = {self.var: xr.DataArray(np.concatenate(list(self.dict_predict.values())),
                                                             coords={'time': list_time_model,
                                                                     'lon': self.dict_predict[f"{self.var}_{0}"]
                                                             .coords['lon'].values, 'lat': self.
                                                             dict_predict[f"{self.var}_{0}"]
-                                                            .coords['lat'].values}, dims=['time', 'lat', 'lon'])}
+                                                            .coords['lat'].values},
+                                                             attrs = {'long_name': self.dict_predict[f"{self.var}_{0}"]
+                                                            .attrs["long_name"],
+                                                            'units': self.dict_predict[f"{self.var}_{0}"]
+                                                            .attrs["units"]},
+                                                            dims=['time', 'lat', 'lon'])}
                 self.dict_pred_1D = {self.var: np.concatenate(list(self.dict_pred_1D.values()))}
                 self.dict_standardized_pred_1D = {self.var: np.concatenate(list(self.dict_standardized_pred_1D
                                                                                 .values()))}
@@ -159,6 +175,9 @@ class Predictand:
         self.res = self.ll[1] - self.ll[0]
 
     def _initialize_attributes(self):
+        """
+        Initialize members of class with None or empty object
+        """
         self.clusters = None
         self.dict_clusters_d = {}
         self.clustersnumber_save = None
@@ -175,7 +194,7 @@ class Predictand:
         self.Z = None
         self.Z_dict = None
 
-    def _get_dim_boundaries(self, label):
+    def _get_dim_boundaries(self, label: str):
         """
         get dimensions of latitudes and longitudes from ini-file
         :param label: name of variable. If one uses a cluster the variable name is the same for different
@@ -203,7 +222,12 @@ class Predictand:
             .where(self.dict_mask[self.config[self.sec]["var"]] == 0, 0)
 
     def _transform_to_1d_and_remove_nans(self, label):
-        """ transfrom array and set values 0, where no data is found as well reshape to 1D"""
+        """
+        transfrom array and set values 0, where no data is found as well reshape to 1D
+        apply mask to input-file
+        :param label: name of variable. If one uses a cluster the variable name is the same for different
+        model initialization and therefore I renamed the variable name.
+        """
         # self.dict_pred_1D[var] = 1
         self.logger.info('Reshape to 1D array and remove nans')
         self.dict_pred_1D[label] = np.reshape(np.array(self.dict_predict[label]),
@@ -231,7 +255,7 @@ class Predictand:
         self.Z = linkage(self.dict_standardized_pred_1D[self.var], self.method_name)
 
     def _set_f(self):
-        """ get f from cluster method using linkage, k and maxclust criterium"""
+        """ get f (flat clusters) from cluster method using linkage, k and maxclust criterium"""
         self.f = fcluster(self.Z, self.k, criterion='maxclust')
         # order according to frequency
         self.f_bins = np.bincount(self.f - 1)
@@ -242,19 +266,19 @@ class Predictand:
         for nr, f_el in enumerate(self.f - 1):
             self.f[nr] = self.f_final[f_el]
 
-    def _set_directory_plots(self, directory):
+    def _set_directory_plots(self, directory: str):
         """
         set directories for plots
         :param directory: directory for images
         """
-        self.directory_plots = directory
+        self.directory_plots = f"{self.output_path}/{directory}"
 
     def _set_directory_files(self, directory):
         """
         set directory for files
         :param directory: directory for images
         """
-        self.directory_files = directory
+        self.directory_files = f"{self.output_path}/{directory}"
 
     def _set_clusters_1d(self):
         """ set 1d clusters from f"""
@@ -274,7 +298,7 @@ class Predictand:
                                                   (self.dict_predict[self.var].shape[1],
                                                    self.dict_predict[self.var].shape[2]))
 
-    def _calculate_standardized_predictand(self, label):
+    def _calculate_standardized_predictand(self, label: str):
         """
         calculate the standardized predictand
         :param label: name of variable. If one uses a cluster the variable name is the same for different
@@ -290,7 +314,7 @@ class Predictand:
         else:
             self.dict_standardized_pred_1D[label] = self.varAnom
 
-    def calculate_clusters_from_test_data(self, train_data: list, method_name: str, k: int):
+    def calculate_clusters_from_test_data(self, train_data: dict, method_name: str, k: int):
         """
         calculate clusters for predictand variable
         :param train_data: cluster data which should be used to calculate clusters
@@ -316,7 +340,9 @@ class Predictand:
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
 
     def _cluster_frequency(self):
-        """ calculate cluster frequency ffrom f"""
+        """
+        Calculate cluster frequency from f
+        """
         self.cluster_frequency = np.bincount(self.f)
         self.cluster_frequency = np.divide(self.cluster_frequency, float(self.dict_predict[self.var].shape[0]))*100
         for j in range(self.k):
@@ -325,7 +351,9 @@ class Predictand:
         self.cluster_bin = np.bincount(self.f)
 
     def _states_of_each_cluster(self):
-        """ linkage only states from certain clusters -- Do I need this?"""
+        """
+        Linkage only states from certain clusters -- Do I need this?
+        """
         for step, i in enumerate(self.f):
             self.dict_clusters_d[f"clusters_{i}"] = self.dict_standardized_pred_1D[self.var][step]
         # Clustering
@@ -337,23 +365,54 @@ class Predictand:
             i = i + 1
 
     def plot_years(self):
-        """ plot years of predictand"""
-        self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/")
+        """
+        Plot each year of variable
+        """
+        self._set_directory_plots(
+            f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/")
-        Path(self.directory_files).mkdir(parents=True, exist_ok=True)
+
+        # path for each cluster
+        directories_plots = {}
+        directories_files = {}
+        for i in range(self.k):
+            directories_plots[i] = (
+                f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/Cluster_{i}/")
+            Path(directories_plots[i]).mkdir(parents=True, exist_ok=True)
+            directories_files[i] = (
+                f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/Cluster_{i}/")
+            Path(directories_files[i]).mkdir(parents=True, exist_ok=True)
         for year in range(len(self.dict_standardized_pred_1D[self.var])):
-            var_reshape = np.reshape(self.dict_pred_1D[self.var][year], (self.dict_predict[self.var].shape[1],
-                                                                         self.dict_predict[self.var].shape[2]))
-            self.data_vars[f"{self.var}"] = xr.DataArray(var_reshape, dims=('lat', 'lon'))
-            # (( 'lat','lon'), self.clusters_reshape[i])
-            self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_predict[self.var].coords["lon"].values,
-                                                         'lat': self.dict_predict[self.var].coords["lat"].values})
+            var_reshape = np.reshape(self.dict_standardized_pred_1D[self.var][year],
+                                     (self.dict_predict[self.var].shape[1],
+                                      self.dict_predict[self.var].shape[2]))
+            self.lons, self.lats = np.meshgrid(self.dict_predict[self.var].coords['lon'].values,
+                                               self.dict_predict[self.var].coords['lat'].values)
+
+            self.data_vars = {}
+            self.data_vars[f"cluster_{self.var}"] = xr.DataArray(var_reshape,
+                                                                 coords={
+                                                                     'lon': self.dict_predict[self.var].coords[
+                                                                         'lon'].values,
+                                                                     'lat': self.dict_predict[self.var].coords[
+                                                                         'lat'].values},
+                                                                 attrs={'long_name': self.dict_predict[self.var].attrs[
+                                                                     "long_name"],
+                                                                        'units': self.dict_predict[self.var].attrs[
+                                                                            "units"]},
+                                                                 dims=['lat', 'lon'])
+            lsize = 14
+            axislsize = 10
+            plt.rc("legend", frameon=False, fontsize=lsize)
+            plt.rc("axes", labelsize=lsize, titlesize=lsize)
+            plt.rc("xtick", labelsize=lsize)
+            plt.rc("ytick", labelsize=lsize)
+            plt.rc("lines", linewidth=0.5)
+            plt.rc("figure", dpi=100)
             # n_cols = max(n, 1)
             map_proj = ccrs.PlateCarree()
-            self.ds_arrays = self.ds[f"{self.var}"]
             ax = plt.axes(projection=map_proj)
-            self.ds[f"{self.var}"].plot(
+            self.data_vars[f"cluster_{self.var}"].plot(
                 ax=ax,
                 transform=ccrs.PlateCarree(),  # the data's projection
                 cmap=plt.cm.get_cmap('seismic', 31),
@@ -363,27 +422,40 @@ class Predictand:
             ax.add_feature(cfeature.BORDERS, linewidth=0.1)
             ax.coastlines()
             ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-            # Without this aspect attributes the maps will look chaotic and the
-            # "extent" attribute above will be ignored
-            # ax.set_aspect("equal")
-            ax.set_aspect(aspect=self.ds.dims["lon"] / self.ds.dims["lat"])
             ax.set_title(f"{self.var}, {self.dict_predict[self.var].time.values[year]}, cluster: {self.f[year]}",
                          fontsize=10)
-            # ax.contourf(self.lons, self.lats, significance, levels=[0., 0.05, 0.5, 0.95, 1],
-            #             hatches=["/////", ".....", None, None, None], colors='none', transform=ccrs.PlateCarree())
-            # # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
-            self.logger.debug(f"Save in {self.directory_plots}/{self.var}_{self.dict_predict[self.var].time.values[year]}"
-                         f".pdf")
-            plt.savefig(f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_predict[self.var].time.values[year]}"
+            gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                              linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
+            gl.xlabels_top = False
+            gl.ylabels_right = False
+            gl.xformatter = LONGITUDE_FORMATTER
+            gl.yformatter = LATITUDE_FORMATTER
+            gl.xlabel_style = {'size': axislsize, 'color': 'black'}
+            gl.ylabel_style = {'size': axislsize, 'color': 'black'}
+            gl.xlocator = mticker.FixedLocator([i for i in range(-180, -0, 30)])
+            gl.ylocator = mticker.FixedLocator([i for i in range(10, 100, 20)])
+
+            self.logger.debug(f"{directories_plots[self.f[year]]}/{year:03d}_"
+                              f"{self.dict_predict[self.var].time.values[year]}.png")
+
+            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_{self.var}_"
+                        f"{self.dict_predict[self.var].time.values[year]}"
                         f".pdf")
-            plt.savefig(f"{self.directory_plots}/{year:03d}_{self.dict_predict[self.var].time.values[year]}.png")
+            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_"
+                        f"{self.dict_predict[self.var].time.values[year]}.png")
+            plt.savefig(f"{self.directory_plots}/{year:03d}_"
+                        f"{self.dict_predict[self.var].time.values[year]}.png")
             plt.close()
 
     def time_plot(self):
-        """ plot all time points of mean predictand"""
-        self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
+        """
+        Plot variable for each model and each time point as mean
+        """
+        self._set_directory_plots(
+            f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
+        self._set_directory_files(
+            f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
         time1 = self.dict_predict[self.var].coords["time"].values
         time = [i for i in range(len(time1))]
@@ -411,43 +483,6 @@ class Predictand:
         fig_sns.savefig(f"{self.directory_plots}/{self.var}_time_plot.png")
         plt.close()
 
-    def _save_clusters_plot(self):
-        """ save clusters into one plot using xarray library"""
-        # self._set_clustersnumber_save()
-        self._create_dataset_from_clusters()
-
-        n_cols = min(self.k, 4)
-        n_cols = np.ceil(self.k / n_cols)
-        # n_cols = max(n, 1)
-        map_proj = ccrs.PlateCarree()
-        self.ds_arrays = self.ds.to_array()
-
-        p = self.ds_arrays.plot(
-            transform=ccrs.PlateCarree(),  # the data's projection
-            col="variable",
-            cmap=plt.cm.get_cmap('seismic', 31),
-            size=2,
-            col_wrap=int(n_cols),  # multiplot settings
-            aspect=self.ds.dims["lon"] / self.ds.dims["lat"],  # for a sensible figsize
-            subplot_kws={"projection": map_proj},  # the plot's projection
-        )
-
-        # We have to set the map's options on all four axes
-        for ip, ax in enumerate(p.axes.flat):
-            if ip < self.k:
-                ax.add_feature(cfeature.BORDERS, linewidth=0.1)
-                ax.coastlines()
-                ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-                # Without this aspect attributes the maps will look chaotic and the
-                # "extent" attribute above will be ignored
-                # ax.set_aspect("equal")
-                title = self.cluster_frequency[ip]
-                ax.set_title(f"Cluster {ip} - {title:4.2f} %", fontsize=10)
-
-        self.logger.debug(f"Save in {self.directory_plots}/clusters.pdf")
-        plt.savefig(f"{self.directory_plots}/clusters.pdf")
-        plt.close()
-
     def plot_clusters_and_time_series(self):
         """Plot clusters"""
         # self._save_separate_clusters()
@@ -472,7 +507,7 @@ class Predictand:
         sns.set_style()
         plt.plot(time_data, clust_data, 'o', linestyle='-')
         plt.close()
-        fig5.savefig(f"{self.directory_plots}timeSeries_{self.method_name}_{self.k}.pdf")
+        fig5.savefig(f"{self.directory_plots}/timeSeries_{self.method_name}_{self.k}.pdf")
         # use pickle since savetxt gives warning
         pickle.dump(np.hstack((time_data, clust_data)).astype(float),
                     open(f"{self.directory_files}/timeSeries_{self.method_name}_{self.k}.txt", "wb"))
@@ -480,14 +515,18 @@ class Predictand:
         #            fmt='%4.2f', delimiter=".")  # x,y,z equal sized 1D arrays
 
     def _save_timeseries_f(self):
-        """ save and plot f as pdf and pickle file respectively"""
+        """
+        Save time series of f in pickle
+        """
         time_data = [self.time_start_file + float(i)
                      for i in range(int(self.dict_standardized_pred_1D[self.var].shape[0]))]
         pickle.dump(np.hstack((time_data, self.f)).astype(float),
                     open(f"{self.directory_files}/timeSeries_{self.method_name}_{self.k}_f.txt", "wb"))
 
     def plot_elbow_plot(self):
-        """ plot and save elbow plot as well as 2. derivative of elbow plot"""
+        """
+        Plot and save elbow plot as well as 2. derivative of elbow plot
+        """
         fig3 = plt.figure()
         last = self.Z[-10:, 2]
         last_reverse = last[::-1]
@@ -507,7 +546,9 @@ class Predictand:
                     open(f"{self.directory_files}/timeSeries_{self.method_name}_{self.k}.txt", "wb"))
 
     def plot_fancy_dendrogram(self):
-        """ plot a nicer dendrogram than the default dendrogram"""
+        """
+        Plot a nicer dendrogram than the default dendrogram
+        """
         fig2 = plt.figure()
         _fancy_dendrogram(
             self.Z,
@@ -523,7 +564,9 @@ class Predictand:
         plt.close()
 
     def plot_dendrogram(self):
-        """ plot and save normal dendrogram"""
+        """
+        Plot and save normal dendrogram
+        """
         fig1 = plt.figure()
         plt.title('Hierarchical Clustering Dendrogram (truncated)')
         plt.xlabel('sample index')
@@ -540,22 +583,108 @@ class Predictand:
         fig1.savefig(f"{self.directory_plots}/Dendrogram_{self.method_name}.pdf")
         plt.close()
 
+    def _save_clusters_plot(self):
+        """ Save clusters into one plot using xarray library"""
+        # self._set_clustersnumber_save()
+        self._create_dataset_from_clusters()
+
+        n_cols = min(self.k, 4)
+        n_cols = np.ceil(self.k / n_cols)
+        # n_cols = max(n, 1)
+        map_proj = ccrs.PlateCarree()
+        # self.data_vars[f"cluster_{self.var}"]
+        lsize = 14
+        axislsize = 10
+        plt.rc("legend", frameon=False, fontsize=lsize)
+        plt.rc("axes", labelsize=lsize, titlesize=lsize)
+        plt.rc("xtick", labelsize=lsize)
+        plt.rc("ytick", labelsize=lsize)
+        plt.rc("lines", linewidth=0.5)
+        plt.rc("figure", dpi=100)
+
+        p = self.data_vars[f"cluster_{self.var}"].plot(
+            transform=ccrs.PlateCarree(),  # the data's projection
+            col="c",
+            cmap=plt.cm.get_cmap('seismic', 31),
+            size=5,
+            aspect=2,
+            sharey=True,
+            col_wrap=int(n_cols),  # multiplot settings
+            # aspect=len(self.lats ) / len(self.lons),  # for a sensible figsize
+            subplot_kws={"projection": map_proj},  # the plot's projection
+            add_colorbar=False,
+            # cbar_kwargs={'shrink': 0.8, 'pad': 0.02, "label":
+            # f"[{self.dict_predict[self.var].attrs['units']}]"},
+        )
+
+        p.fig.subplots_adjust(hspace=0.05, wspace=0.03)
+        # p.fig.subplots_adjust(hspace=0.5)
+        p.add_colorbar(orientation='vertical', label=f"{self.dict_predict[self.var].attrs['long_name']} "
+                                                     f"[{self.dict_predict[self.var].attrs['units']}]",
+                       aspect=30, shrink=0.8, pad=0.0)
+        # p.fig.ax.set_ylabel(f"[{self.dict_predict[self.var].attrs['units']}]")
+        # # We have to set the map's options on all four axes
+
+        for ip, ax in enumerate(p.axes.flat):
+
+            if ip < self.k:
+                ax.add_feature(cfeature.BORDERS, linewidth=0.1)
+                ax.coastlines()
+                ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
+
+                gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                                  linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
+                gl.xlabels_top = False
+                gl.ylabels_right = False
+                if n_cols > 1 and ip % n_cols:
+                    gl.ylabels_left = False
+                gl.xformatter = LONGITUDE_FORMATTER
+                gl.yformatter = LATITUDE_FORMATTER
+                gl.xlabel_style = {'size': axislsize, 'color': 'black'}
+                gl.ylabel_style = {'size': axislsize, 'color': 'black'}
+                gl.xlocator = mticker.FixedLocator([i for i in range(-180, -0, 30)])
+                gl.ylocator = mticker.FixedLocator([i for i in range(10, 100, 20)])
+                # Without this aspect attributes the maps will look chaotic and the
+                # "extent" attribute above will be ignored
+                ax.set_aspect("equal")
+                title = self.cluster_frequency[ip]
+                ax.set_title(f"Cluster {ip} - {title:4.2f} %", fontsize=lsize)
+
+        self.logger.debug(f"Save in {self.directory_plots}/clusters.pdf")
+        # p.fig.canvas.draw_idle()
+        # plt.tight_layout()
+        plt.subplots_adjust(left=0.03, right=0.82, top=0.95, bottom=0.05)
+        plt.savefig(f"{self.directory_plots}/clusters.pdf")
+        plt.close()
+
     def _create_dataset_from_clusters(self):
-        """ create dataset for clusters as netcdf using xarray library"""
+        """
+        Create dataset for clusters as netcdf using xarray library
+        """
         self.logger.info("create dataset with clusters as variables")
         self.data_vars = {}
-        for i in range(self.k):
-            # cs = int(self.k) - int(self.clustersnumber_save[i]) - 1
-            self.data_vars[f"cluster_{self.var}_{i}"] = xr.DataArray(self.clusters_reshape[i], dims=('lat', 'lon'))
-            # (( 'lat','lon'), self.clusters_reshape[i])
-        self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_predict[self.var].coords["lon"].values,
-                                                     'lat': self.dict_predict[self.var].coords["lat"].values})
+        self.lons, self.lats = np.meshgrid(self.dict_predict[self.var].coords['lon'].values,
+                                           self.dict_predict[self.var].coords['lat'].values)
+        self.data_vars = {}
+        self.data_vars[f"cluster_{self.var}"] = xr.DataArray(self.clusters_reshape,
+                                                             coords={
+                                                                 'lon': self.dict_predict[self.var].coords[
+                                                                     'lon'].values,
+                                                                 'lat': self.dict_predict[self.var].coords[
+                                                                     'lat'].values},
+                                                             attrs={'long_name': self.dict_predict[self.var].attrs[
+                                                                 "long_name"],
+                                                                    'units': self.dict_predict[self.var].attrs[
+                                                                        "units"]},
+                                                             dims=['c', 'lat', 'lon'])
 
     def save_clusters(self):
-        """ save clusters using xarray"""
+        """
+        Save clusters using xarray
+        """
         self.logger.info("Save clusters as netcdf")
         self._create_dataset_from_clusters()
-        self.ds.to_netcdf(f"{self.directory_files}/clusters.nc")
+        self.data_vars[f"cluster_{self.var}"].to_netcdf(f"{self.directory_files}/clusters.nc")
 
     def calculate_rms(self):
         """
@@ -565,7 +694,7 @@ class Predictand:
         self.dict_standardized_pred_rmse = np.zeros(self.dict_standardized_pred_1D[self.var].shape[1])
         for ci in range(self.dict_standardized_pred_1D[self.var].shape[1]):
             time_series = self.dict_standardized_pred_1D[self.var][:, ci]
-            time_series_squared = time_series**2
+            time_series_squared = time_series ** 2
             time_series_squared_mean = np.mean(time_series_squared, axis=0)
             self.dict_standardized_pred_rmse[ci] = np.sqrt(time_series_squared_mean)
         self.dict_standardized_pred_rmse_reshape[self.var] = np.reshape(self.dict_standardized_pred_rmse,
@@ -579,7 +708,7 @@ class Predictand:
         p = self.ds_arrays.plot(
             cmap=plt.cm.get_cmap('seismic', 31),
             size=5,
-            aspect=self.ds.dims["lon"] / self.ds.dims["lat"],  # for a sensible figsize
+            aspect=self.ds.dims["y"] / self.ds.dims["x"],  # for a sensible figsize
         )
 
         # We have to set the map's options on all four axes

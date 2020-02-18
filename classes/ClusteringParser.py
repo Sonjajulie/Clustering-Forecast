@@ -1,4 +1,7 @@
 import argparse
+import os
+
+
 class ClusteringParser:
     """ For parsing variables in command line"""
     def __init__(self):
@@ -20,5 +23,7 @@ class ClusteringParser:
         self.parser.add_argument('-o', '--outputlabel', type=str, required=True,
                                  help='The name of the output folder. If it is called standardized, the variable input '
                                       'will be standardized. Note that the folder will be called output-{outputlabel}')
+        self.parser.add_argument('-outp', '--outputpath', type=str, required=False, default=os.getcwd(),
+                                 help='The name of the output path before output, necessary for year-plots, where you need a lot of storage. If not specified path of progarm is used')
         self.args = self.parser.parse_args()
         self.arguments = vars(self.args)

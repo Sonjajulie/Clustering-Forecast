@@ -38,10 +38,11 @@ sns.set()
 class Composites:
     """Store and analyse possible precursors"""
 
-    def __init__(self, inifile_in: str, output_label: str, cl_config: dict):
+    def __init__(self, inifile_in: str, output_path: str, output_label: str, cl_config: dict):
         """
         Store all parameters necessary for loading the netcdf file
         :param inifile_in: file for initialization of variable
+        :param output_path: path, where output should be saved
         :param output_label: label for substring of output directory
         :param cl_config: dictionary, where all information of logger is stored from classes/config
         """
@@ -60,6 +61,7 @@ class Composites:
         self.end_n = None
         self.time_dim = None
         self.bootstrap_arrays = None
+        self.output_path = output_path
         self.output_label = output_label
 
         # all precursors in the ini-file should be assigned to the dictionary
@@ -324,6 +326,7 @@ class Composites:
                 # for significance plotting --> ice and snow should be also
                 # plotted for 95 %
                 hatches_ = ["/////", "...", None, None, "...", "/////", None]
+
                 levels_ = [0, self.percent_boot, self.percent_boot + 4, 50,
                            100 - self.percent_boot - 4, 100 - self.percent_boot, 100]
                 if k == 5 or k == 7:
@@ -369,7 +372,10 @@ class Composites:
                         self.var = self.config[prec]["name"]
                     self._calculate_significance(ip, k, self.var, percent_boot)
                     title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
-                    ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} %", fontsize=lsize)
+                    if self.var == "ICEFRAC" or self.var == "FSNO":
+                        ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} % / {(self.percent_boot + 5):3.2f} %", fontsize=lsize)
+                    else:
+                        ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} %", fontsize=lsize)
                     plt.rcParams['hatch.linewidth'] = 0.03  # hatch linewidth
                     plt.rcParams['hatch.color'] = 'k'  # hatch color --> black
                     ax.contourf(self.lons, self.lats,
@@ -408,11 +414,12 @@ class Composites:
         :param method_name: name of method used to calculate clusters (e.g. ward)
         """
         for prec in self.precs_sections:
+            # f"/glade/scratch/totz/
             self._set_directory_plots(
-                f"output-{self.output_label}//{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/years/plots/")
+            f"{self.output_path}/output-{self.output_label}/{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/years/plots/")
             Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
             self._set_directory_files(
-                f"output-{self.output_label}//{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/years/files/")
+                f"{self.output_path}/output-{self.output_label}/{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/years/files/")
             Path(self.directory_files).mkdir(parents=True, exist_ok=True)
             for year in range(len(self.dict_precursors[self.var])):
                 var_reshape = np.reshape(self.dict_standardized_precursors[self.config[prec]["name"]][year],
@@ -456,11 +463,11 @@ class Composites:
                              f"{f[year]}", fontsize=10)
                 self.logger.debug(
                     f"Save in {self.directory_plots}/{self.var}_{self.dict_precursors[self.var].time.values[year]}.pdf")
+                # ~ plt.savefig(
+                    # ~ f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
+                    # ~ f".pdf")
                 plt.savefig(
-                    f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
-                    f".pdf")
-                plt.savefig(
-                    f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
+                    f"{self.directory_plots}/{year:05d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
                     f".png")
                 plt.close()
 
@@ -475,10 +482,10 @@ class Composites:
         for prec in self.precs_sections:
             self.var = f"{self.config[prec]['name']}"
             self._set_directory_plots(
-                f"output-{self.output_label}//{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/plots/")
+                f"{self.output_path}/output-{self.output_label}//{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/plots/")
             Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
             self._set_directory_files(
-                f"output-{self.output_label}//{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/files/")
+                f"{self.output_path}/output-{self.output_label}//{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/files/")
             Path(self.directory_files).mkdir(parents=True, exist_ok=True)
             time1 = self.dict_precursors[self.var].coords["time"].values
             time = [t_i for t_i in range(len(time1))]
@@ -564,14 +571,14 @@ class Composites:
         set directories for plots
         :param directory: path for plot directory
         """
-        self.directory_plots = directory
+        self.directory_plots = f"{self.output_path}/{directory}"
 
     def _set_directory_files(self, directory: str):
         """
         set directories for plots
         :param directory: path for files directory
         """
-        self.directory_files = directory
+        self.directory_files = f"{self.output_path}/{directory}"
 
     def _calculate_significance(self, ik: int, k: int, key: str, percent_boot: int):
         """calculate significance of composite using the bootstrap method

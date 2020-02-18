@@ -60,13 +60,14 @@ def _fancy_dendrogram(*args, **kwargs):
 class Clusters:
     """ Class to analyze Predictand """
 
-    def __init__(self, inifile_in: str, output_label: str, cl_config: dict):
+    def __init__(self, inifile_in: str, output_path: str, output_label: str, cl_config: dict):
         """
         Initialize Clusters--> read file(s) using ini-file
         apply mask, if necessary
         extract data such as time and spatial data
         create 1d array
         :param inifile_in: file for initialization of variable
+        :param output_path: path, where output should be saved
         :param output_label: label for substring of output directory
         :param cl_config: dictionary, where all information of logger is stored from classes/config
         """
@@ -78,6 +79,7 @@ class Clusters:
         self.config = configparser.ConfigParser()
         self.config.read(self.inifile)
         self.dict_standardized_pred_rmse = {}
+        self.output_path = output_path
         self.output_label = output_label
 
         self.logger.debug(f"Sections: {[prec for prec in self.config.sections() if 'PRED:' in prec]}")
@@ -265,14 +267,14 @@ class Clusters:
         set directories for plots
         :param directory: directory for images
         """
-        self.directory_plots = directory
+        self.directory_plots = f"{self.output_path}/{directory}"
 
     def _set_directory_files(self, directory):
         """
         set directory for files
         :param directory: directory for images
         """
-        self.directory_files = directory
+        self.directory_files = f"{self.output_path}/{directory}"
 
     def _set_clusters_1d(self):
         """ set 1d clusters from f"""
@@ -362,16 +364,16 @@ class Clusters:
         """
         Plot each year of variable
         """
-        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/")
+        self._set_directory_plots(f"/glade/scratch/totz/output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
         
         # path for each cluster
         directories_plots = {}
         directories_files = {}
-        for i in range(self.k):
-            directories_plots[i] = (f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/Cluster_{i}/")
+        for i in range(self.k): # /glade/scratch/totz
+            directories_plots[i] = (f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/plots/Cluster_{i}/")
             Path(directories_plots[i]).mkdir(parents=True, exist_ok=True)
-            directories_files[i] = (f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/Cluster_{i}/")
+            directories_files[i] = (f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/years/files/Cluster_{i}/")
             Path(directories_files[i]).mkdir(parents=True, exist_ok=True)
         for year in range(len(self.dict_standardized_pred_1D[self.var])):
             var_reshape = np.reshape(self.dict_standardized_pred_1D[self.var][year], (self.dict_predict[self.var].shape[1],
@@ -425,15 +427,11 @@ class Clusters:
             gl.xlocator = mticker.FixedLocator([i for i in range(-180, -0, 30)])
             gl.ylocator = mticker.FixedLocator([i for i in range(10, 100, 20)])
 
-            self.logger.debug(f"{directories_plots[self.f[year]]}/{year:03d}_"
+            self.logger.debug(f"{directories_plots[self.f[year]]}/{year:05d}_"
                               f"{self.dict_predict[self.var].time.values[year]}.png")
-
-            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_{self.var}_"
-                        f"{self.dict_predict[self.var].time.values[year]}"
-                        f".pdf")
-            plt.savefig(f"{directories_plots[self.f[year]]}/{year:03d}_"
+            plt.savefig(f"{directories_plots[self.f[year]]}/{year:05d}_"
                         f"{self.dict_predict[self.var].time.values[year]}.png")
-            plt.savefig(f"{self.directory_plots}/{year:03d}_"
+            plt.savefig(f"{self.directory_plots}/{year:05d}_"
                         f"{self.dict_predict[self.var].time.values[year]}.png")
             plt.close()
 
@@ -639,9 +637,8 @@ class Clusters:
                 ax.set_title(f"Cluster {ip} - {title:4.2f} %", fontsize=lsize)
 
         self.logger.debug(f"Save in {self.directory_plots}/clusters.pdf")
-        # p.fig.canvas.draw_idle()
-        # plt.tight_layout()
-        plt.subplots_adjust(left=0.03, right=0.82, top=0.95, bottom=0.05)
+        plt.subplots_adjust(left=0.05, right=0.82, top=0.95, bottom=0.05)
+
         plt.savefig(f"{self.directory_plots}/clusters.pdf")
         plt.close()
 

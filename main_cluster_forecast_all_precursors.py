@@ -46,7 +46,8 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     var = cl_parser.arguments['predictand']
     inifile = cl_parser.arguments['inifile']
     output_label = cl_parser.arguments['outputlabel']
-    predictand = Predictand(inifile, output_label, cl_config)
+    output_path = cl_parser.arguments['outputpath']
+    predictand = Predictand(inifile, output_path, output_label, cl_config)
 
     # load forecast-parameters
     method_name = 'ward'
@@ -58,7 +59,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     pattern_corr_values = []
 
     # load precursors
-    precursors = Precursors(inifile, output_label, cl_config)
+    precursors = Precursors(inifile, output_path, output_label, cl_config)
     all_precs_names = [x for x in precursors.dict_precursors.keys()]
 
     # Create train and test dataset with an 66:33 split
