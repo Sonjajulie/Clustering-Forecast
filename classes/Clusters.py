@@ -7,6 +7,7 @@ Created on Tue Dec 10 16:11:43 2019
 """
 import os
 import matplotlib as mpl
+# if I do not use this trick, no plots will be saved!
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
@@ -118,8 +119,6 @@ class Clusters:
                 #                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
                 list_time_model = [f"model {i + 1}, date: {j.year}-{j.month}-{j.day}" for i in range(length_files)
                                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
-                coords_old = self.dict_predict[f"{self.var}_{0}"].coords
-                attrs_old = self.dict_predict[f"{self.var}_{0}"].attrs
 
                 self.dict_predict = {self.var: xr.DataArray(np.concatenate(list(self.dict_predict.values())),
                                                             coords={'time': list_time_model,
@@ -310,8 +309,9 @@ class Clusters:
     def calculate_clusters(self, method_name, k):
         """
         calculate clusters for predictand variable
-        :param k: cluster number
-        :param method_name: name of method used to calculate clusters (e.g. ward)
+        :param train_data: cluster data which should be used to calculate clusters
+        :param method_name: name of the method used for clustering
+        :param k: number of clusters
         """
         self.logger.info('Calculate clusters')
         # self._calculate_standardized_predictand()
@@ -391,6 +391,14 @@ class Clusters:
                                                                         'units': self.dict_predict[self.var].attrs[
                                                                             "units"]},
                                                                  dims=['lat', 'lon'])
+            lsize = 14
+            axislsize = 10
+            plt.rc("legend", frameon=False, fontsize=lsize)
+            plt.rc("axes", labelsize=lsize, titlesize=lsize)
+            plt.rc("xtick", labelsize=lsize)
+            plt.rc("ytick", labelsize=lsize)
+            plt.rc("lines", linewidth=0.5)
+            plt.rc("figure", dpi=100)
             # n_cols = max(n, 1)
             map_proj = ccrs.PlateCarree()
             ax = plt.axes(projection=map_proj)
@@ -406,6 +414,17 @@ class Clusters:
             ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
             ax.set_title(f"{self.var}, {self.dict_predict[self.var].time.values[year]}, cluster: {self.f[year]}",
                          fontsize=10)
+            gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                              linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
+            gl.xlabels_top = False
+            gl.ylabels_right = False
+            gl.xformatter = LONGITUDE_FORMATTER
+            gl.yformatter = LATITUDE_FORMATTER
+            gl.xlabel_style = {'size': axislsize, 'color': 'black'}
+            gl.ylabel_style = {'size': axislsize, 'color': 'black'}
+            gl.xlocator = mticker.FixedLocator([i for i in range(-180, -0, 30)])
+            gl.ylocator = mticker.FixedLocator([i for i in range(10, 100, 20)])
+
             self.logger.debug(f"{directories_plots[self.f[year]]}/{year:03d}_"
                               f"{self.dict_predict[self.var].time.values[year]}.png")
 
@@ -577,22 +596,25 @@ class Clusters:
             cmap=plt.cm.get_cmap('seismic', 31),
             size=5,
             aspect=2,
+            sharey=True,
             col_wrap=int(n_cols),  # multiplot settings
             # aspect=len(self.lats ) / len(self.lons),  # for a sensible figsize
             subplot_kws={"projection": map_proj},  # the plot's projection
             add_colorbar=False,
-            # cbar_kwargs={'shrink': 0.8, 'pad': 0.02, "label": f"[{self.dict_predict[self.var].attrs['units']}]"},
+            # cbar_kwargs={'shrink': 0.8, 'pad': 0.02, "label":
+            # f"[{self.dict_predict[self.var].attrs['units']}]"},
         )
-        p.fig.subplots_adjust(hspace=0.01, wspace=0.1)
-        # p.fig.subplots_adjust(hspace=0.5)
-        # kwargs={'orientation':'vertical','shrink': 0.8, 'pad': 0.02, "label": f"[{self.dict_predict[self.var].attrs['units']}]"}
-        p.add_colorbar(orientation='vertical', label=f"{self.dict_predict[self.var].attrs['long_name']} "
-                                                     f"[{self.dict_predict[self.var].attrs['units']}]",
-                       shrink=0.8, pad=0.02)
 
+        p.fig.subplots_adjust(hspace=0.05, wspace=0.03)
+        # p.fig.subplots_adjust(hspace=0.5)
+        p.add_colorbar(orientation='vertical',  label=f"{self.dict_predict[self.var].attrs['long_name']} "
+                                                     f"[{self.dict_predict[self.var].attrs['units']}]",
+                       aspect=30,shrink=0.8, pad=0.0)
         # p.fig.ax.set_ylabel(f"[{self.dict_predict[self.var].attrs['units']}]")
         # # We have to set the map's options on all four axes
+
         for ip, ax in enumerate(p.axes.flat):
+
             if ip < self.k:
                 ax.add_feature(cfeature.BORDERS, linewidth=0.1)
                 ax.coastlines()
@@ -602,6 +624,8 @@ class Clusters:
                                   linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
                 gl.xlabels_top = False
                 gl.ylabels_right = False
+                if n_cols > 1 and ip % n_cols:
+                    gl.ylabels_left = False
                 gl.xformatter = LONGITUDE_FORMATTER
                 gl.yformatter = LATITUDE_FORMATTER
                 gl.xlabel_style = {'size': axislsize, 'color': 'black'}
@@ -610,11 +634,14 @@ class Clusters:
                 gl.ylocator = mticker.FixedLocator([i for i in range(10,100,20)])
                 # Without this aspect attributes the maps will look chaotic and the
                 # "extent" attribute above will be ignored
-                # ax.set_aspect("equal")
+                ax.set_aspect("equal")
                 title = self.cluster_frequency[ip]
                 ax.set_title(f"Cluster {ip} - {title:4.2f} %", fontsize=lsize)
 
         self.logger.debug(f"Save in {self.directory_plots}/clusters.pdf")
+        # p.fig.canvas.draw_idle()
+        # plt.tight_layout()
+        plt.subplots_adjust(left=0.03, right=0.82, top=0.95, bottom=0.05)
         plt.savefig(f"{self.directory_plots}/clusters.pdf")
         plt.close()
 
@@ -624,7 +651,6 @@ class Clusters:
         """
         self.logger.info("create dataset with clusters as variables")
         self.data_vars = {}
-# <<<<<<< HEAD
         self.lons, self.lats = np.meshgrid(self.dict_predict[self.var].coords['lon'].values,
                                            self.dict_predict[self.var].coords['lat'].values)
         self.data_vars = {}
@@ -635,25 +661,7 @@ class Clusters:
                                                              attrs={'long_name': self.dict_predict[self.var] .attrs["long_name"],
                                                                     'units': self.dict_predict[self.var].attrs["units"]},
                                                              dims=['c', 'lat', 'lon'])
-# ||||||| merged common ancestors
-#         for i in range(self.k):
-#             # cs = int(self.k) - int(self.clustersnumber_save[i]) - 1
-#             self.data_vars[f"cluster_{self.var}_{i}"] = xr.DataArray(self.clusters_reshape[i], dims=('lat', 'lon'))
-#             # (( 'lat','lon'), self.clusters_reshape[i])
-#         self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_predict[self.var].coords["lon"].values,
-#                                                      'lat': self.dict_predict[self.var].coords["lat"].values})
-# =======
-#         for i in range(self.k):
-#             # cs = int(self.k) - int(self.clustersnumber_save[i]) - 1
-#             self.data_vars[f"cluster_{self.var}_{i}"] = xr.DataArray(self.clusters_reshape[i], dims=('lat', 'lon'))
-#             # (( 'lat','lon'), self.clusters_reshape[i])
-#         self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_predict[self.var].coords["lon"].values,
-#                                                      'lat': self.dict_predict[self.var].coords["lat"].values},
-#                                              attrs={'long_name': self.dict_predict[self.var].coords["long_name"].values,
-#                                                     'units': self.dict_predict[self.var].coords["units"].values
-#                                              }
-#                                                      )
-# >>>>>>> 20740e111746bae7e63c1762ec3978dcb0bd00c4
+
 
     def save_clusters(self):
         """

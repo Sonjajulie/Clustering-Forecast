@@ -21,10 +21,11 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
     # load inifile according to variable
     inifile = cl_parser.arguments['inifile']
-    predictand = Predictand(inifile, cl_parser.arguments['outlabel'])
+    output_label = cl_parser.arguments['outputlabel']
+    predictand = Predictand(inifile, output_label, cl_config)
     # load forecast-parameters
     method_name = 'ward'
-    k = 6
+    k = 5
     forecast = Forecast(inifile, cl_config, k, method_name)
     logger.info("Clusters: " + str(forecast.k))
     diff = int(forecast.end_year) - int(forecast.beg_year)
@@ -32,7 +33,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     pattern_corr_values = []
 
     # load precursors
-    precursors = Precursors(inifile, cl_config)
+    precursors = Precursors(inifile, output_label, cl_config)
     all_precs_names = [x for x in precursors.dict_precursors.keys()]
 
     # Calculate forecast for all years
