@@ -324,8 +324,8 @@ class Composites:
                 # for significance plotting --> ice and snow should be also
                 # plotted for 95 %
                 hatches_ = ["/////", "...", None, None, "...", "/////", None]
-                levels_ = [0, self.percent_boot, self.percent_boot + 4, 50,
-                           100 - self.percent_boot - 4, 100 - self.percent_boot, 100],
+                levels_ = [0, self.percent_boot, self.percent_boot + 4, 50,100 - self.percent_boot - 4, 100 - self.percent_boot, 100]
+                
                 if k == 5 or k == 7:
                     n_cols1 = 1
             else:
@@ -335,6 +335,7 @@ class Composites:
             map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(), ccrs.LambertConformal(),
                                  ccrs.Orthographic(0, 90)]
             map_project = map_project_array[self.map_proj_nr]
+
             lsize = 14
             axislsize = 9
             plt.rc("legend", frameon=False, fontsize=lsize)
@@ -357,7 +358,7 @@ class Composites:
 
             p.fig.subplots_adjust(hspace=0.2, wspace=0.15)
             p.add_colorbar(orientation='vertical', label=f"{self.dict_precursors[self.var].attrs['long_name']} [{self.dict_precursors[self.var].attrs['units']}]", shrink=0.8,
-                           pad=0.02)
+                           aspect=30, pad=0.02)
             for ip, ax in enumerate(p.axes.flat):
                 if ip < k:
                     ax.add_feature(cfeature.BORDERS, linewidth=0.1)
@@ -365,32 +366,39 @@ class Composites:
                     ax.gridlines(color="Gray", linestyle="dotted", linewidth=0.5)
                     if self.cut_area:
                         ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-                    # self._calculate_significance(ip, k, self.config[prec]["name"], percent_boot)
+                        self.var = self.config[prec]["name"]
+                    self._calculate_significance(ip, k, self.var, percent_boot)
                     title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
-                    ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} %", fontsize=lsize)
+                    if self.var == "ICEFRAC" or self.var == "FSNO":
+                        ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} % / {(self.percent_boot + 5):3.2f} %", fontsize=lsize)
+                    else:
+                        ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} %", fontsize=lsize)
                     plt.rcParams['hatch.linewidth'] = 0.03  # hatch linewidth
                     plt.rcParams['hatch.color'] = 'k'  # hatch color --> black
-                    # ax.contourf(self.lons, self.lats,
-                    #             np.reshape(self.composites_significance[self.config[prec]["name"]][ip],
-                    #                        (self.dict_precursors[self.config[prec]["name"]].shape[1],
-                    #                         self.dict_precursors[self.config[prec]["name"]].shape[2])),
-                    #             levels=levels_,
-                    #             hatches=hatches_, colors='none',
-                    #             transform=ccrs.PlateCarree())  # alpha=0.0,
-                    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
-                                      linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
-                    gl.xlabels_top = False
-                    gl.ylabels_right = False
-                    gl.xformatter = LONGITUDE_FORMATTER
-                    gl.yformatter = LATITUDE_FORMATTER
-                    gl.xlabel_style = {'size': axislsize, 'color': 'black'}
-                    gl.ylabel_style = {'size': axislsize, 'color': 'black'}
-                    gl.xlocator = mticker.FixedLocator([i for i in range(-180,190,30)])
-                    gl.ylocator = mticker.FixedLocator([i for i in range(-100,100,20)])
+                    ax.contourf(self.lons, self.lats,
+                                np.reshape(self.composites_significance[self.var][ip],
+                                           (self.dict_precursors[self.var].shape[1],
+                                            self.dict_precursors[self.var].shape[2])),
+                                levels=levels_,
+                                hatches=hatches_, colors='none',
+                                transform=ccrs.PlateCarree())  # alpha=0.0,
+                    if map_project == ccrs.PlateCarree():
+                        gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                                          linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
+                        gl.xlabels_top = False
+                        gl.ylabels_right = False
+                        if n_cols1 > 1 and ip % n_cols1:
+                            gl.ylabels_left = False
+                        gl.xformatter = LONGITUDE_FORMATTER
+                        gl.yformatter = LATITUDE_FORMATTER
+                        gl.xlabel_style = {'size': axislsize, 'color': 'black'}
+                        gl.ylabel_style = {'size': axislsize, 'color': 'black'}
+                        gl.xlocator = mticker.FixedLocator([i for i in range(-180,190,30)])
+                        gl.ylocator = mticker.FixedLocator([i for i in range(-100,100,20)])
                     # Without this aspect attributes the maps will look chaotic and the
                     # "extent" attribute above will be ignored
                     # ax.set_aspect("equal")
-
+            plt.subplots_adjust(left=0.03, right=0.82, top=0.95, bottom=0.05)
             plt.savefig(f"{self.directory_plots}/composites.pdf")
             plt.close()
 
@@ -404,10 +412,10 @@ class Composites:
         """
         for prec in self.precs_sections:
             self._set_directory_plots(
-                f"output//{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/years/plots/")
+                f"/glade/scratch/totz/output-{self.output_label}/{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/years/plots/")
             Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
             self._set_directory_files(
-                f"output//{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/years/files/")
+                f"/glade/scratch/totz/output-{self.output_label}/{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/years/files/")
             Path(self.directory_files).mkdir(parents=True, exist_ok=True)
             for year in range(len(self.dict_precursors[self.var])):
                 var_reshape = np.reshape(self.dict_standardized_precursors[self.config[prec]["name"]][year],
@@ -451,11 +459,11 @@ class Composites:
                              f"{f[year]}", fontsize=10)
                 self.logger.debug(
                     f"Save in {self.directory_plots}/{self.var}_{self.dict_precursors[self.var].time.values[year]}.pdf")
+                # ~ plt.savefig(
+                    # ~ f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
+                    # ~ f".pdf")
                 plt.savefig(
-                    f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
-                    f".pdf")
-                plt.savefig(
-                    f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
+                    f"{self.directory_plots}/{year:05d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
                     f".png")
                 plt.close()
 
@@ -470,10 +478,10 @@ class Composites:
         for prec in self.precs_sections:
             self.var = f"{self.config[prec]['name']}"
             self._set_directory_plots(
-                f"output//{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/plots/")
+                f"output-{self.output_label}/{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/plots/")
             Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
             self._set_directory_files(
-                f"output//{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/files/")
+                f"output-{self.output_label}/{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/files/")
             Path(self.directory_files).mkdir(parents=True, exist_ok=True)
             time1 = self.dict_precursors[self.var].coords["time"].values
             time = [t_i for t_i in range(len(time1))]

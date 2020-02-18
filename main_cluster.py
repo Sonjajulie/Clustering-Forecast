@@ -27,9 +27,8 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     pred_clusters = Clusters(inifile, output_label, cl_config)
     # pred_clusters = Clusters(f"ini/clusters_America_TS.ini")
     method_name = 'ward'
-
-    # ~ for k in [3, 4, 5, 6, 7, 8, 9]:
     for k in [5]:
+    # ~ for k in [3, 4, 5, 6, 7, 8, 9]:
         pred_clusters.calculate_clusters(method_name, k)
         pred_clusters.plot_clusters_and_time_series()
         pred_clusters.plot_elbow_plot()
