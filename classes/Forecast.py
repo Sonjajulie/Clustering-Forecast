@@ -50,7 +50,7 @@ class Forecast:
         self.k = k
         self.config = configparser.ConfigParser()
         self.config.read(self.inifile)
-        """ get begin and end time for forecast from ini file"""
+        # get begin and end time for forecast from ini file
         self.beg_year = int(self.config["Forecast-Parameters"]["begin"])
         # assert self.beg_year >= 1967, \
         #     logger.error(f"Start year of forecast must be 1967 or higher! It is {self.beg_year}")
@@ -58,7 +58,6 @@ class Forecast:
         self.diff = self.end_year - self.beg_year
         assert self.diff > 0, \
             self.logger.error(f"end year of forecast must be greater than start year! It is {self.end_year}")
-        self.end_year = self.config["Forecast-Parameters"]["end"]
         # Select from saveArray which precursors should be used to calculate forecast
         # self.list_precursors = ast.literal_eval(config.get("Forecast-Parameters", "forecastprecs"))
         self.list_precursors_all = ast.literal_eval(self.config.get("Forecast-Parameters", "forecastprecs"))
@@ -93,7 +92,7 @@ class Forecast:
 
         return self.forecast_var
 
-    def prediction(self, clusters_1d: dict, composites_1d: dict, data_year_1d: np.ndarray, year: int):
+    def prediction(self, clusters_1d: dict, composites_1d: dict, data_year_1d: dict, year: int):
         """make forecast
         :param clusters_1d: dict of all k-clusters
         :param composites_1d: dict of composites with time and one-dimensional array
@@ -149,14 +148,39 @@ class Forecast:
         self.t_corr_arr = np.zeros((forecast_data.shape[1]))
         self.t_corr_signif_arr = np.zeros((forecast_data.shape[1]))
         start_obs = int(self.beg_year) - time_start_file + 1
-        end_end= int(self.end_year) - time_start_file + 1
+        end_end = int(self.end_year) - time_start_file + 1
         for i in range(forecast_data.shape[1]):
-            t_corr = stats.pearsonr(forecast_data[0:self.diff, i], data_1d[start_obs:end_end, i])
+            # check whether value in data range does not change, but has same value as observational data
+            # because then it is still correct even though there is no curve --> only for debug
+            # normally these are areas which are not considered in the analys as continents for sst
+            if all(data_1d[start_obs:end_end, i] == forecast_data[0:self.diff, i]) and \
+                    data_1d[start_obs:end_end, i][0] == 0:
+                self.t_corr_arr[i] =1
+                self.t_corr_signif_arr[i] = 0
+            else:
+                t_corr = stats.pearsonr(forecast_data[0:self.diff, i], data_1d[start_obs:end_end, i])
+                self.t_corr_arr[i] = t_corr[0]
+                self.t_corr_signif_arr[i] = t_corr[1]
+                # if t_corr[1] > 0.05:
+                #     self.t_corr_signif_arr[i] = self.t_corr_arr[i]
+                # else:
+                #     self.t_corr_signif_arr[i] = 1
+
+        return self.t_corr_arr, self.t_corr_signif_arr
+
+    def calculate_time_correlation_all_times(self, data_1d: np.ndarray, forecast_data: np.ndarray, time_start_file: int):
+        """calculate time correlation for given forecast data for all times --> easier function for model data
+        :param forecast_data: list of forecasted data
+        :param data_1d: list of obervational data which shoud be forecasted
+        :type time_start_file: int
+        """
+        self.t_corr_arr = np.zeros((forecast_data.shape[1]))
+        self.t_corr_signif_arr = np.zeros((forecast_data.shape[1]))
+
+        for i in range(forecast_data.shape[1]):
+            # if value does not change, it leads to np.nan
+            t_corr = stats.pearsonr(forecast_data[:, i], data_1d[:, i])
             self.t_corr_arr[i] = t_corr[0]
-            # if t_corr[1] > 0.05:
-            #     self.t_corr_signif_arr[i] = self.t_corr_arr[i]
-            # else:
-            #     self.t_corr_signif_arr[i] = 1
             self.t_corr_signif_arr[i] = t_corr[1]
 
         return self.t_corr_arr, self.t_corr_signif_arr
