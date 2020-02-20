@@ -62,19 +62,26 @@ class Precursors:
         self.bootstrap_arrays = None
         self.output_label = output_label
         self.output_path = output_path
+        self.directories_plots = {}
+        self.directories_files = {}
+        self.map_proj_nr = {}
+        self.cut_area = {}
+        self.fig_size = {}
+        self.aspect = {}
 
         # all precursors in the ini-file should be assigned to the dictionary
         self._initialize_attributes()
         #  read precursors from ini-file
         self.precs_sections = [prec for prec in self.config.sections() if 'PREC:' in prec]
         for prec in self.precs_sections:
+            self.var = self.config[prec]["name"]
             # create dictionaries for each precursor again
             self.dict_prec_1D_var = {}
             self.dict_precursors_var = {}
             self.dict_standardized_precursors_var = {}
             if "nc" in self.config[prec]["filepath"]:
                 # with xr.set_options(enable_cftimeindex=True):
-                self.var = self.config[prec]["name"]
+
                 self.dict_precursors_var[self.var] = xr.open_dataset(self.config[prec]["filepath"])[
                     self.config[prec]["var"]]
                 self._set_area_composite(self.var, prec)
@@ -96,9 +103,9 @@ class Precursors:
                                                                                    .values()))}
                 self.dict_prec_1D = {self.var: np.concatenate(list(self.dict_prec_1D_var.values()))}
                 if self.config.has_option(prec, "map_proj"):
-                    self.map_proj_nr = int(self.config[prec]["map_proj"])
-                self.fig_size = int(self.config[prec]["figsize"])
-                self.aspect = int(self.config[prec]["aspect"])
+                    self.map_proj_nr[self.var] = int(self.config[prec]["map_proj"])
+                self.fig_size[self.var] = int(self.config[prec]["figsize"])
+                self.aspect[self.var] = int(self.config[prec]["aspect"])
                 self.cross_size = float(self.config[prec]["hashsize"])
             else:
                 # since models have the same time and variable, an artificial time must
@@ -107,7 +114,6 @@ class Precursors:
                 self.path = f"{self.config[prec]['filepath']}/"
                 self.list_of_files = [os.path.join(self.path, item) for item in os.listdir(self.path)
                                       if os.path.isfile(os.path.join(self.path, item))]
-                self.var = self.config[prec]["name"]
                 # ,decode_times=False,combine='by_coords'   .load()
                 self.list_of_files = sorted(self.list_of_files)
                 length_files = len(self.list_of_files)
@@ -119,11 +125,12 @@ class Precursors:
                     if self.config.has_option(prec, "mask"):
                         self._get_and_apply_mask(f"{self.var}_{file}", prec)
                     self._transform_to_1d_and_remove_nans(f"{self.var}_{file}")
+                    ##############################################################
                     self._calculate_standardized_precursors(f"{self.var}_{file}")
                 if self.config.has_option(prec, "map_proj"):
-                    self.map_proj_nr = int(self.config[prec]["map_proj"])
-                self.fig_size = int(self.config[prec]["figsize"])
-                self.aspect = int(self.config[prec]["aspect"])
+                    self.map_proj_nr[self.var] = int(self.config[prec]["map_proj"])
+                self.fig_size[self.var] = int(self.config[prec]["figsize"])
+                self.aspect[self.var] = int(self.config[prec]["aspect"])
                 self.cross_size = float(self.config[prec]["hashsize"])
                 # change dimenson of precursor  to changed to dim = [time*models,lons,lats]!
                 # list_time_model = [f"{i + 1}: {j}" for i in range(len(self.list_of_files))
@@ -167,9 +174,8 @@ class Precursors:
         self.composites_significance_y = {}
         self.composites_significance = {}
         self.cluster_frequency = []
-        self.cut_area = False
-        self.aspect_ratio = 1
-        self.map_proj_nr = 0
+
+
 
     def _set_area_composite(self, label: str, config_var: str):
         """
@@ -191,9 +197,11 @@ class Precursors:
                 self.dict_precursors_var[label] = self.dict_precursors_var[label].reindex(
                     latitude=self.dict_precursors_var[label].latitude[::-1])
             if self.config.has_option(config_var, "coords"):
-                self.cut_area = True
-                self.dict_precursors_var[label] = self.dict_precursors_var[label].sel(latitude=slice(*self.lat_bnds),
+                self.cut_area[self.var] = True
+                self.dict_precursors_var[self.var] = self.dict_precursors_var[label].sel(latitude=slice(*self.lat_bnds),
                                                                                       longitude=slice(*self.lon_bnds))
+            else:
+                self.cut_area[self.var] = False
         elif all(x in self.dict_precursors_var[label].coords for x in ['lat', 'lon']):
             self.label_lat, self.label_lon = 'lat', 'lon'
             # if latitude is sorted from positive to negative change order
@@ -202,8 +210,11 @@ class Precursors:
                 self.dict_precursors_var[label] = self.dict_precursors_var[label].reindex(
                     lat=self.dict_precursors_var[label].lat[::-1])
             if self.config.has_option(config_var, "coords"):
+                self.cut_area[self.var] = True
                 self.dict_precursors_var[label] = self.dict_precursors_var[label].sel(lat=slice(*self.lat_bnds),
                                                                                       lon=slice(*self.lon_bnds))
+            else:
+                self.cut_area[self.var] = False
         else:
             raise ValueError("Spatial attribute (e.g. latitude and longitude) not found!")
 
@@ -262,7 +273,17 @@ class Precursors:
         """
         self._set_cluster_frequency(f)
         for prec in self.dict_precursors.keys():
+            self.var = f"{self.config[prec]['name']}"
             self._create_composites(prec, f, k, method_name, predictand)
+            # path for each composite
+
+            self.directories_plots[self.var] = f"{self.output_path}/output-{self.output_label}/" \
+                                               f"/{predictand}/Composites/{self.var}/" \
+                                               f"{method_name}_Composite_{k}/plots/"
+            Path(self.directories_plots[self.var]).mkdir(parents=True, exist_ok=True)
+            self.directories_files[self.var] = f"{self.output_path}/output-{self.output_label}/{predictand}" \
+                                               f"/Composites/{self.var}/{method_name}_Composite_{k}/files/"
+            Path(self.directories_files[self.var]).mkdir(parents=True, exist_ok=True)
 
     def _set_v_arr(self, prec: str, nb: int):
         """ get array from dictionary for certain key
@@ -307,12 +328,12 @@ class Precursors:
         for i_cl in range(int(k)):
             self.dict_composites[key][i_cl] = np.divide(self.dict_composites[key][i_cl], (self.cluster_frequency[i_cl]))
 
-        self._set_directory_plots(f"output-{self.output_label}//{predictand}/Composites/{key}/"
-                                  f"{method_name}_Composite_{k}/plots/")
-        Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output-{self.output_label}//{predictand}/Composites/"
-                                  f"{key}/{method_name}_Composite_{k}/files/")
-        Path(self.directory_files).mkdir(parents=True, exist_ok=True)
+        # self._set_directory_plots(f"output-{self.output_label}//{predictand}/Composites/{key}/"
+        #                           f"{method_name}_Composite_{k}/plots/")
+        # Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
+        # self._set_directory_files(f"output-{self.output_label}//{predictand}/Composites/"
+        #                           f"{key}/{method_name}_Composite_{k}/files/")
+        # Path(self.directory_files).mkdir(parents=True, exist_ok=True)
 
     def plot_composites(self, k: int):
         """
@@ -328,16 +349,16 @@ class Precursors:
         """
         self.logger.info("Plot composites")
         for prec in self.precs_sections:
-            self._create_dataset_from_composites(self.config[prec]["name"], k)
+            self._create_dataset_from_composites(prec, k)
             n_rows1 = min(k, 4)
             n_cols1 = np.ceil(k / n_rows1)
-            if self.var == "ICEFRAC" or self.var == "FSNO":
+            if "ICEFRAC" in self.var or "FSNO" in self.var:
                 if k == 5 or k == 7:
                     n_cols1 = 1
             # n_cols1 = max(n, 1)
             map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(), ccrs.LambertConformal(),
-                                 ccrs.Orthographic(0, 90)]
-            map_project = map_project_array[self.map_proj_nr]
+                                 ccrs.Orthographic(0, 90), ccrs.PlateCarree(180)]
+            map_project = map_project_array[self.map_proj_nr[self.var]]
             lsize = 14
             axislsize = 9
             plt.rc("legend", frameon=False, fontsize=lsize)
@@ -347,43 +368,33 @@ class Precursors:
             plt.rc("lines", linewidth=0.5)
             plt.rc("figure", dpi=100)
             p = self.data_vars[f"composite{self.var}"].plot(transform=ccrs.PlateCarree(),
-                                    col='variable',
+                                    col='c',
                                     col_wrap=int(n_cols1),
                                     cmap=plt.cm.get_cmap('seismic', 31),
                                     subplot_kws={'projection': map_project},
-                                    size=self.fig_size,  # 10, 3,  8
+                                    size=self.fig_size[self.var],  # 10, 3,  8
                                     add_colorbar=False,
-                                    aspect=self.aspect,  # 2,  # 1.5
+                                    aspect=self.aspect[self.var],  # 2,  # 1.5
                                     # cbar_kwargs={'shrink': 0.8, 'pad':0.02},
                                     )
 
-            p.fig.subplots_adjust(hspace=0.1, wspace=0.1)
+            p.fig.subplots_adjust(hspace=0.15, wspace=0.15)
             p.add_colorbar(orientation="vertical", label=f"{self.dict_precursors[self.var].attrs['long_name']} [{self.dict_precursors[self.var].attrs['units']}]", shrink=0.8,
                            aspect=30, pad=0.02)
+
             for ip, ax in enumerate(p.axes.flat):
                 if ip < k:
                     ax.add_feature(cfeature.BORDERS, linewidth=0.1)
                     ax.add_feature(cfeature.COASTLINE, linewidth=0.1)
-                    ax.gridlines(color="Gray", linestyle="dotted", linewidth=0.5)
-                    if self.cut_area:
-                        ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
+                    # ax.gridlines(color="Gray", linestyle="dotted", linewidth=0.5)
 
-                        self.var = self.config[prec]["name"]
-                    self._calculate_significance(ip, k, self.var, percent_boot)
                     title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
-                    ax.set_title(f"Composite {ip}- {title:4.2f} % -  p = {self.percent_boot:3.2f} %", fontsize=lsize)
+                    ax.set_title(f"Composite {ip} ({title:4.2f} %)", fontsize=lsize)
                     plt.rcParams['hatch.linewidth'] = 0.03  # hatch linewidth
                     plt.rcParams['hatch.color'] = 'k'  # hatch color --> black
-                    ax.contourf(self.lons, self.lats,
-                                np.reshape(self.composites_significance[self.var][ip],
-                                           (self.dict_precursors[self.var].shape[1],
-                                            self.dict_precursors[self.var].shape[2])),
-                                levels=levels_,
-                                hatches=hatches_, colors='none',
-                                transform=ccrs.PlateCarree())  # alpha=0.0,
-                    if map_project == ccrs.PlateCarree():
-                        gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
-                                          linewidth=0.02, color='gray', alpha=0.5, linestyle='--')
+                    if self.map_proj_nr[self.var] == 0 or self.map_proj_nr[self.var] == 4:
+                        gl = ax.gridlines(draw_labels=True,
+                                          linewidth=0.02, color='gray', linestyle='--')
                         gl.xlabels_top = False
                         gl.ylabels_right = False
                         if n_cols1 > 1 and ip % n_cols1:
@@ -394,11 +405,17 @@ class Precursors:
                         gl.ylabel_style = {'size': axislsize, 'color': 'black'}
                         gl.xlocator = mticker.FixedLocator([i for i in range(-180, 190, 30)])
                         gl.ylocator = mticker.FixedLocator([i for i in range(-100, 100, 20)])
+
+                    if self.cut_area[self.var]:
+                        self.var = self.config[prec]["name"]
+                        self._get_dim_boundaries(self.var)
+                        # ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
+                        ax.set_extent([self.lon_min, self.lon_max, self.lat_min, self.lat_max])
                     # Without this aspect attributes the maps will look chaotic and the
                     # "extent" attribute above will be ignored
                     # ax.set_aspect("equal")
-            plt.subplots_adjust(left=0.03, right=0.82, top=0.95, bottom=0.05)
-            plt.savefig(f"{self.directory_plots}/composites.pdf")
+            plt.subplots_adjust(left=0.03, right=0.82, top=0.90, bottom=0.05)
+            plt.savefig(f"{self.directories_plots[self.var]}/composites.png")
             plt.close()
 
     def plot_years(self, predictand: str, method_name: str, k: int, f: np.ndarray):
@@ -442,7 +459,7 @@ class Precursors:
                 # n_cols = max(n, 1)
                 map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(), ccrs.LambertConformal(),
                                      ccrs.Orthographic(0, 90)]
-                map_project = map_project_array[self.map_proj_nr]
+                map_project = map_project_array[self.map_proj_nr[self.map_proj_nr[self.var]]]
                 self.ds_arrays = self.ds[f"{self.config[prec]['name']}"]
                 ax = plt.axes(projection=map_project)
                 self.data_vars[f"{self.config[prec]['name']}"].plot(
@@ -464,12 +481,12 @@ class Precursors:
                 ax.set_title(f"{self.var}, {self.dict_precursors[self.var].time.values[year]}, cluster: "
                              f"{f[year]}", fontsize=10)
                 self.logger.debug(
-                    f"Save in {self.directory_plots}/{self.var}_{self.dict_precursors[self.var].time.values[year]}.pdf")
+                    f"Save in {self.directories_plots[self.var]}/{self.var}_{self.dict_precursors[self.var].time.values[year]}.pdf")
                 plt.savefig(
-                    f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
+                    f"{self.directories_plots[self.var]}/{year:05d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
                     f".pdf")
                 plt.savefig(
-                    f"{self.directory_plots}/{year:03d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
+                    f"{self.directories_plots[self.var]}/{year:05d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
                     f".png")
                 plt.close()
 
@@ -511,8 +528,8 @@ class Precursors:
             plt.ylabel(f"mean {self.var}")
             fig_sns = sns_plot.get_figure()
             self.logger.debug(f"Save in {self.directory_plots}/{self.var}_time_plot.pdf")
-            fig_sns.savefig(f"{self.directory_plots}/{self.var}_time_plot.pdf")
-            fig_sns.savefig(f"{self.directory_plots}/{self.var}_time_plot.png")
+            fig_sns.savefig(f"{self.directories_plots[self.var]}/{self.var}_time_plot.pdf")
+            fig_sns.savefig(f"{self.directories_plots[self.var]}/{self.var}_time_plot.png")
             plt.close()
 
 
@@ -524,19 +541,12 @@ class Precursors:
         """
         self.logger.info("Create dataset with composites as variables")
         self._set_composites_reshape(key, k)
-        # self.data_vars = {}
-        # for ik in range(k):
-        #     self.data_vars[f"composites_{key}_{ik}"] = \
-        #         (xr.DataArray((self.composites_reshape[key][ik]), dims=('lat', 'lon')))
-        #     # (( 'lat','lon'), self.clusters_reshape[ik])
-        # self.ds = xr.Dataset(self.data_vars, coords={'lon': self.dict_precursors[key].coords["lon"].values,
-        #                                              'lat': self.dict_precursors[key].coords["lat"].values})
-
         self.data_vars = {}
         self.lons, self.lats = np.meshgrid(self.dict_precursors[self.var].coords['lon'].values,
                                            self.dict_precursors[self.var].coords['lat'].values)
         self.data_vars = {}
-        self.data_vars[f"composite{self.var}"] = xr.DataArray(self.composites_reshape[key],
+        self.var = self.config[key]["name"]
+        self.data_vars[f"composite{self.var}"] = xr.DataArray(self.composites_reshape[self.var],
                                                              coords={
                                                                      'lon': self.dict_precursors[self.var].coords['lon'].values,
                                                                  'lat': self.dict_precursors[self.var].coords['lat'].values},
@@ -551,14 +561,15 @@ class Precursors:
         :param key: name of precursor
         :param k: cluster number
         """
-        self.composites_reshape[key] = np.zeros(
-            (k, self.dict_precursors[key].shape[1],
-             self.dict_precursors[key].shape[2]))
+        self.var = self.config[key]["name"]
+        self.composites_reshape[self.var] = np.zeros(
+            (k, self.dict_precursors[self.var].shape[1],
+             self.dict_precursors[self.var].shape[2]))
         for ik in range(int(k)):
-            self.composites_reshape[key][ik] = \
-                np.reshape(self.dict_composites[key][ik],
-                           (self.dict_precursors[key].shape[1],
-                            self.dict_precursors[key].shape[2]))
+            self.composites_reshape[self.var][ik] = \
+                np.reshape(self.dict_composites[self.var][ik],
+                           (self.dict_precursors[self.var].shape[1],
+                            self.dict_precursors[self.var].shape[2]))
 
     def save_composites(self, k: int):
         """
@@ -567,8 +578,9 @@ class Precursors:
         """
         self.logger.info("Save composites as netcdf")
         for prec in self.precs_sections:
-            self._create_dataset_from_composites(self.config[prec]["name"], k)
-            self.data_vars[f"composite{self.var}"].to_netcdf(f"{self.directory_files}/composites_{self.config[prec]['name']}_{k}.nc")
+            self.var = self.config[prec]["name"]
+            self._create_dataset_from_composites(self.var, k)
+            self.data_vars[f"composite{self.var}"].to_netcdf(f"{self.directories_plots[self.var]}/composites_{self.config[prec]['name']}_{k}.nc")
 
     def _set_directory_plots(self, directory: str):
         """
@@ -606,10 +618,25 @@ class Precursors:
         :param method_name: method for clustering
         :param predictand: variable name of predictand
         """
-        self.dict_standardized_precursors = train_data
+        # do I really need this?
+        # self.dict_prec_1D_var = train_data
         self._set_cluster_frequency(f)
+        self.dict_standardized_precursors = train_data
+         # go through all forecast variables
         for prec in self.dict_precursors.keys():
+            self.var = prec
+
+            # do I really need this?
+            # self._calculate_standardized_precursors(self.var)
+            self.directories_plots[self.var] = f"{self.output_path}/output-{self.output_label}/" \
+                                               f"/{predictand}/Composites/{self.var}/" \
+                                               f"{method_name}_Composite_{k}/plots/"
+            Path(self.directories_plots[self.var]).mkdir(parents=True, exist_ok=True)
+            self.directories_files[self.var] = f"{self.output_path}/output-{self.output_label}/{predictand}" \
+                                               f"/Composites/{self.var}/{method_name}_Composite_{k}/files/"
+            Path(self.directories_files[self.var]).mkdir(parents=True, exist_ok=True)
             self._create_composites(prec, f, k, method_name, predictand)
+
 
     def _remove_year(self, prec: str, year=-1):
         """

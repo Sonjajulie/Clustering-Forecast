@@ -3,14 +3,18 @@ import numpy as np
 from classes.MixtureModel import MixtureGaussianModel
 from classes.PredictandToyModel import PredictandToyModel
 from classes.Clusters import Clusters
+from classes.Config import Config
 
 
 class TestClusters(unittest.TestCase):
-    """ Crete test class for composites"""
+    """ Create test class for clusters"""
     def setUp(self):
         """initialize class cluster"""
-        inifile = "/home/sonja/Documents/Composites/ini/clusters_America_prec_t.ini"
-        self.clusters = Clusters(inifile)
+        inifile = "/home/sonja/Documents/Clustering-Forecast/ini/clusters_America_prec_t.ini"
+        output_path =  "/home/sonja/Documents/Clustering-Forecast/tests/"
+        output_label =  "TEST"
+        cl_config = Config("Test.log")
+        self.clusters = Clusters(inifile, output_path, output_label, cl_config.config_dict)
         self.initialize_data()
 
     def initialize_data(self):
@@ -34,7 +38,7 @@ class TestClusters(unittest.TestCase):
         # array which lead with composites to clusters pf PRCP
         self.array = np.array([[1, 2, 1, 1], [-0.5, 0, -0.5, 1.], [-1, 0, -1, -1]], np.float)
         self.prcp_clusters = [{"cluster": [ 1, -1, 1]}, {"cluster": [1, 1, -1]}]
-        self.prcp = Predictand(self.prcp_clusters, self.array)
+        self.prcp = PredictandToyModel(self.prcp_clusters, self.array)
         self.y = self.prcp.get_data_from_precursors(self.X)
         self.method_name = "ward"
         self.k = 2

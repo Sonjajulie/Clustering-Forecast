@@ -118,7 +118,9 @@ class Predictand:
                     if self.config.has_option(self.sec, "mask"):
                         self._get_and_apply_mask(f"{self.var}_{i}")
                     self._transform_to_1d_and_remove_nans(f"{self.var}_{i}")
+                    ###############################################################
                     self._calculate_standardized_predictand(f"{self.var}_{i}")
+
                 # What dimenson has self.dict_precursors.values() ? dim = [model,time,lons,lats]?
                 # has to be changed to dim = [time*models,lons,lats]!
                 # 97 x 59# make dataset instead of array!!self.dict_precursors[f"{self.var}_{0}"].coords['time'].values
@@ -322,7 +324,12 @@ class Predictand:
         :param k: number of clusters
         """
         self.logger.info('Calculate clusters')
-        self.dict_standardized_pred_1D = (train_data)
+        # do I really need this?
+        # self.dict_pred_1D = train_data
+        # for key in train_data.keys():
+        #     self._calculate_standardized_predictand(key)
+
+        self.dict_standardized_pred_1D = train_data
         self._set_method_name(method_name)
         self._set_k(k)
         self._set_linkage()

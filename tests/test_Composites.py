@@ -2,14 +2,17 @@ import unittest
 import numpy as np
 import random
 from classes.Composites import Composites
-
+from classes.Config import Config
 
 class TestComposites(unittest.TestCase):
     """ Create test class for composites"""
     def setUp(self):
         """initialize class composites"""
-        inifile = "ini/composites_America_PSL.ini"
-        self.composites = Composites(inifile)
+        inifile = "/home/sonja/Documents/Clustering-Forecast/ini/composites_America_PSL.ini"
+        output_path =  "/home/sonja/Documents/Clustering-Forecast/tests/"
+        output_label =  "TEST"
+        cl_config = Config("Test.log")
+        self.composites = Composites(inifile, output_path, output_label, cl_config.config_dict)
 
 
 class TestInit(TestComposites):
@@ -59,11 +62,14 @@ class TestInit(TestComposites):
         # initialize array for randomly selected clusters
         self.composites.bootstrap_arrays = np.zeros((self.composites.end_n,
                                                      self.composites.dict_standardized_precursors[key].shape[1]))
-        self.composites._bootstrap_method(key, ik, percent_boot)
+        self.composites._bootstrap_method(key, ik)
         try:
-            np.testing.assert_array_equal(self.composites.composites_significance[key][0], [1., 0., 1.])
+            self.sig_array = [1 if (i == 100) or (i == 0) else 0
+                              for i in self.composites.composites_significance[key][0]]
+            np.testing.assert_array_equal(self.sig_array, [1., 0., 1.])
             res = True
         except AssertionError as err:
             res = False
             print(err)
         self.assertTrue(res)
+

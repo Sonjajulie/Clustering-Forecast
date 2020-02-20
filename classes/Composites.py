@@ -482,10 +482,12 @@ class Composites:
         for prec in self.precs_sections:
             self.var = f"{self.config[prec]['name']}"
             self._set_directory_plots(
-                f"{self.output_path}/output-{self.output_label}//{predictand}/Composites/{self.var}/{method_name}_Composite_{k}/plots/")
+                f"{self.output_path}/output-{self.output_label}//{predictand}/Composites/{self.var}/"
+                f"{method_name}_Composite_{k}/plots/")
             Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
             self._set_directory_files(
-                f"{self.output_path}/output-{self.output_label}//{predictand}/Composites/{self.var}//{method_name}_Composite_{k}/files/")
+                f"{self.output_path}/output-{self.output_label}//{predictand}/Composites/{self.var}/"
+                f"/{method_name}_Composite_{k}/files/")
             Path(self.directory_files).mkdir(parents=True, exist_ok=True)
             time1 = self.dict_precursors[self.var].coords["time"].values
             time = [t_i for t_i in range(len(time1))]
@@ -639,8 +641,8 @@ class Composites:
         for ci, comp_val in enumerate(self.dict_composites[key][ik]):
             xyt_array = self.bootstrap_arrays[:, ci]
             self.composites_significance[key][ik][ci] = stats.percentileofscore(xyt_array, comp_val)
-            if self.composites_significance[key][ik][ci] > 0:
-                alphas.append(self.composites_significance[key][ik][ci])
+            # if self.composites_significance[key][ik][ci] > 0:
+            # alphas.append(self.composites_significance[key][ik][ci])
         # new mechanism to calculate signigicance but does not work as expected
         # that's why it is set to wrong (Wilks et al. (2016))
         if False:
