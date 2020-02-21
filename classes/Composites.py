@@ -26,6 +26,7 @@ from scipy import stats
 import pandas as pd
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import matplotlib.ticker as mticker
+
 # from xscale import signal
 # seed the pseudorandom number generator
 
@@ -379,13 +380,17 @@ class Composites:
                         ax.set_title(f"Composite {ip} ({title:4.2f}%), p = {self.percent_boot:3.2f} %", fontsize=lsize)
                     plt.rcParams['hatch.linewidth'] = 0.03  # hatch linewidth
                     plt.rcParams['hatch.color'] = 'k'  # hatch color --> black
-                    ax.contourf(self.lons, self.lats,
+                    cs = ax.contourf(self.lons, self.lats,
                                 np.reshape(self.composites_significance[self.var][ip],
                                            (self.dict_precursors[self.var].shape[1],
                                             self.dict_precursors[self.var].shape[2])),
                                 levels=levels_,
                                 hatches=hatches_, colors='none',
                                 transform=ccrs.PlateCarree())  # alpha=0.0,
+                    # create a legend for the contour set
+                    # artists, labels = cs.legend_elements()
+                    # ax.legend(artists, labels, handleheight=2)
+
                     if map_project == ccrs.PlateCarree():
                         gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
                                           linewidth=0.02, color='gray', alpha=0.5, linestyle='--')

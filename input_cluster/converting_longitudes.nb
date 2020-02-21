@@ -1,0 +1,344 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 12.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[     10379,        336]
+NotebookOptionsPosition[      8145,        284]
+NotebookOutlinePosition[      8480,        299]
+CellTagsIndexPosition[      8437,        296]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell["Converting longitude from -180 - 180 to 0 - 360", "Title",ExpressionUUID->"1b9c422f-2a3c-455d-8ba5-20b25124f94f"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", 
+   RowBox[{"FSNO", " ", "-", " ", "America"}], "*)"}], "\[IndentingNewLine]", 
+  
+  RowBox[{
+   RowBox[{"Print", "[", 
+    RowBox[{
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "165"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "80"}], ",", "360"}], "]"}]}], "]"}], 
+   "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"FSNO", " ", "-", " ", "Eurasia"}], "*)"}], "\[IndentingNewLine]", 
+   RowBox[{"Print", "[", 
+    RowBox[{
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "0"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+     RowBox[{"Mod", "[", 
+      RowBox[{"75", ",", "360"}], "]"}]}], "]"}]}]}]], "Input",ExpressionUUID->\
+"cf02cf86-989e-455e-9c9b-2e2fa3fe3fac"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{
+  "195", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "280"}],
+  SequenceForm[195, " ", 280],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[8]:=",ExpressionUUID->"f2d23436-d8ab-46d3-ab0b-54e9c6ea3188"],
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{"0", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "75"}],
+  SequenceForm[0, " ", 75],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[8]:=",ExpressionUUID->"56bace6a-d387-466b-976f-2c2d4d4948fe"]
+}, Open  ]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", 
+   RowBox[{"ICEFRAC", " ", "-", " ", "America"}], "*)"}], 
+  "\[IndentingNewLine]", 
+  RowBox[{
+   RowBox[{"Print", "[", 
+    RowBox[{
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "180"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "75"}], ",", "360"}], "]"}]}], "]"}], 
+   "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"ICEFRAC", " ", "-", " ", "Eurasia"}], "*)"}], 
+   "\[IndentingNewLine]", 
+   RowBox[{"Print", "[", 
+    RowBox[{
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "15"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+     RowBox[{"Mod", "[", 
+      RowBox[{"180", ",", "360"}], "]"}]}], "]"}]}]}]], "Input",
+ CellLabel->"In[10]:=",ExpressionUUID->"844fef8a-035f-4c0d-bcb3-36eeb74fe14d"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{
+  "180", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "285"}],
+  SequenceForm[180, " ", 285],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[10]:=",ExpressionUUID->"72599dcf-2c72-4881-ba24-7379abc499c3"],
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{
+  "345", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "180"}],
+  SequenceForm[345, " ", 180],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[10]:=",ExpressionUUID->"bb4101b8-673c-48a2-b85d-2cef1d3f2c07"]
+}, Open  ]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", 
+   RowBox[{"SLP", " ", "-", " ", "Tropics"}], "*)"}], "\[IndentingNewLine]", 
+  RowBox[{
+   RowBox[{"Print", "[", 
+    RowBox[{
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "180"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "70"}], ",", "360"}], "]"}]}], "]"}], 
+   "\[IndentingNewLine]"}]}]], "Input",
+ CellLabel->"In[12]:=",ExpressionUUID->"1998fac0-309c-4e60-b3b6-377fa15af57f"],
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{
+  "180", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "290"}],
+  SequenceForm[180, " ", 290],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[12]:=",ExpressionUUID->"cbcb16be-6b94-4bf1-ac74-47c69f4f2636"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", 
+   RowBox[{"SST", " ", "-", " ", "Tropics"}], "*)"}], "\[IndentingNewLine]", 
+  RowBox[{
+   RowBox[{"Print", "[", 
+    RowBox[{
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "180"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "70"}], ",", "360"}], "]"}]}], "]"}], 
+   "\[IndentingNewLine]", 
+   RowBox[{"Print", "[", 
+    RowBox[{
+     RowBox[{"Mod", "[", 
+      RowBox[{"30", ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+     RowBox[{"Mod", "[", 
+      RowBox[{"180", ",", "360"}], "]"}]}], "]"}]}]}]], "Input",
+ CellLabel->"In[14]:=",ExpressionUUID->"77ada4b7-5409-4f17-8c78-883ae88a1378"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{
+  "180", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "290"}],
+  SequenceForm[180, " ", 290],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[14]:=",ExpressionUUID->"ba81287a-e69f-46ff-9c65-255b0fcc79a1"],
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{"30", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "180"}],
+  SequenceForm[30, " ", 180],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[14]:=",ExpressionUUID->"4a05df99-2ae9-4ef8-8bbc-93d85630ceda"]
+}, Open  ]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", 
+   RowBox[{"SST", " ", "-", " ", "Europe"}], "*)"}], "\[IndentingNewLine]", 
+  RowBox[{
+   RowBox[{"Print", "[", 
+    RowBox[{
+     RowBox[{"Mod", "[", 
+      RowBox[{
+       RowBox[{"-", "15"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+     RowBox[{"Mod", "[", 
+      RowBox[{"60", ",", "360"}], "]"}]}], "]"}], 
+   "\[IndentingNewLine]"}]}]], "Input",
+ CellLabel->"In[17]:=",ExpressionUUID->"5150a61e-f842-4e67-ae3d-1f3bd6be4751"],
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{"345", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "60"}],
+  SequenceForm[345, " ", 60],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[17]:=",ExpressionUUID->"135ff98d-7bae-4196-9228-206fd017c64d"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", 
+   RowBox[{"Z500", " ", "-", " ", "NAmerica"}], "*)"}], "\[IndentingNewLine]", 
+  RowBox[{"Print", "[", 
+   RowBox[{
+    RowBox[{"Mod", "[", 
+     RowBox[{
+      RowBox[{"-", "180"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+    RowBox[{"Mod", "[", 
+     RowBox[{"30", ",", "360"}], "]"}]}], "]"}]}]], "Input",
+ CellLabel->"In[18]:=",ExpressionUUID->"2986daef-d8da-46ca-80ef-3cffd2dd5cdc"],
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{"180", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "30"}],
+  SequenceForm[180, " ", 30],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[18]:=",ExpressionUUID->"7c2b36b5-7956-47b6-a5fe-4c35158ce633"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", 
+   RowBox[{"Z500", " ", "-", " ", "SPacific"}], "*)"}], "\[IndentingNewLine]", 
+  RowBox[{"Print", "[", 
+   RowBox[{
+    RowBox[{"Mod", "[", 
+     RowBox[{
+      RowBox[{"-", "180"}], ",", "360"}], "]"}], ",", "\"\< \>\"", ",", 
+    RowBox[{"Mod", "[", 
+     RowBox[{
+      RowBox[{"-", "60"}], ",", "360"}], "]"}]}], "]"}]}]], "Input",
+ CellLabel->"In[19]:=",ExpressionUUID->"5a9aa171-13c7-4966-b84e-9ba959c69d14"],
+
+Cell[BoxData[
+ InterpretationBox[
+  RowBox[{
+  "180", "\[InvisibleSpace]", "\<\" \"\>", "\[InvisibleSpace]", "300"}],
+  SequenceForm[180, " ", 300],
+  Editable->False]], "Print",
+ CellLabel->
+  "During evaluation of \
+In[19]:=",ExpressionUUID->"9e680bd1-10f5-4a0c-bf34-d4b80dd2bb9b"]
+}, Open  ]]
+}, Open  ]]
+},
+WindowSize->{808, 911},
+WindowMargins->{{Automatic, 465}, {Automatic, 57}},
+FrontEndVersion->"12.0 for Linux x86 (64-bit) (April 8, 2019)",
+StyleDefinitions->"Default.nb"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[580, 22, 119, 0, 162, "Title",ExpressionUUID->"1b9c422f-2a3c-455d-8ba5-20b25124f94f"],
+Cell[CellGroupData[{
+Cell[724, 26, 811, 24, 101, "Input",ExpressionUUID->"cf02cf86-989e-455e-9c9b-2e2fa3fe3fac"],
+Cell[CellGroupData[{
+Cell[1560, 54, 282, 8, 25, "Print",ExpressionUUID->"f2d23436-d8ab-46d3-ab0b-54e9c6ea3188"],
+Cell[1845, 64, 273, 7, 25, "Print",ExpressionUUID->"56bace6a-d387-466b-976f-2c2d4d4948fe"]
+}, Open  ]]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[2167, 77, 845, 25, 101, "Input",ExpressionUUID->"844fef8a-035f-4c0d-bcb3-36eeb74fe14d"],
+Cell[CellGroupData[{
+Cell[3037, 106, 283, 8, 25, "Print",ExpressionUUID->"72599dcf-2c72-4881-ba24-7379abc499c3"],
+Cell[3323, 116, 283, 8, 25, "Print",ExpressionUUID->"bb4101b8-673c-48a2-b85d-2cef1d3f2c07"]
+}, Open  ]]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[3655, 130, 502, 14, 78, "Input",ExpressionUUID->"1998fac0-309c-4e60-b3b6-377fa15af57f"],
+Cell[4160, 146, 283, 8, 25, "Print",ExpressionUUID->"cbcb16be-6b94-4bf1-ac74-47c69f4f2636"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[4480, 159, 710, 20, 78, "Input",ExpressionUUID->"77ada4b7-5409-4f17-8c78-883ae88a1378"],
+Cell[CellGroupData[{
+Cell[5215, 183, 283, 8, 25, "Print",ExpressionUUID->"ba81287a-e69f-46ff-9c65-255b0fcc79a1"],
+Cell[5501, 193, 278, 7, 25, "Print",ExpressionUUID->"4a05df99-2ae9-4ef8-8bbc-93d85630ceda"]
+}, Open  ]]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[5828, 206, 477, 13, 78, "Input",ExpressionUUID->"5150a61e-f842-4e67-ae3d-1f3bd6be4751"],
+Cell[6308, 221, 278, 7, 25, "Print",ExpressionUUID->"135ff98d-7bae-4196-9228-206fd017c64d"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[6623, 233, 434, 11, 55, "Input",ExpressionUUID->"2986daef-d8da-46ca-80ef-3cffd2dd5cdc"],
+Cell[7060, 246, 278, 7, 25, "Print",ExpressionUUID->"7c2b36b5-7956-47b6-a5fe-4c35158ce633"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[7375, 258, 456, 12, 55, "Input",ExpressionUUID->"5a9aa171-13c7-4966-b84e-9ba959c69d14"],
+Cell[7834, 272, 283, 8, 25, "Print",ExpressionUUID->"9e680bd1-10f5-4a0c-bf34-d4b80dd2bb9b"]
+}, Open  ]]
+}, Open  ]]
+}
+]
+*)
+
