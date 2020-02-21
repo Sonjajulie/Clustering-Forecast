@@ -125,11 +125,11 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
             logger.info("Plot and save variables")
             ex = ExportVarPlot(output_label, cl_config)
             ex.save_plot_and_time_correlation(forecast.list_precursors, predictand, pred_t_corr_reshape,
-                                              significance_corr_reshape, forecast.list_precursors_all)
+                                              significance_corr_reshape, forecast.list_precursors_all, np.nanmean(pred_t_corr_reshape))
             dict_skills_pattern[ex.predictor_names] = {'time correlation':  np.nanmean(pred_t_corr_reshape),
                                                        'pattern correlation': np.nanmean(pred_t_corr_reshape)}
     if forecast.plot:
-        with open(f'{output_path}/output-{output_label}/skill_correlation.json', 'w') as fp:
+        with open(f'{output_path}/output-{output_label}/skill_correlation-{predictand.var}.json', 'w') as fp:
             json.dump(dict_skills_pattern, fp)
 
 

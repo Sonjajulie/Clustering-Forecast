@@ -149,10 +149,13 @@ class Predictand:
 
     def _set_extent_cluster(self, label: str):
         """
-         Get Longitudes and Latitudes, check whether latitudes go form -90 to 90 or from 90 to -90,
-        if the letter, reverse order
-        :param label: name of variable. If one uses a cluster the variable name is the same for different
-        model initialization and therefore I renamed the variable name.
+         Get Longitudes and Latitudes, check whether latitudes go form 
+         -90 to 90 or from 90 to -90,
+        if the latter, reverse order
+        :param label: name of variable. If one uses several model files 
+        with the same variable name, the name of the variable must be 
+        changed to a unique label and therefore I renamed the variable 
+        name.
         """
         #  first read whether unit is lat or latitude or something else
         #  https://stackoverflow.com/questions/29135885/netcdf4-extract-for-subset-of-lat-lon
