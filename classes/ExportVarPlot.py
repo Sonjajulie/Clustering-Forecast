@@ -17,6 +17,8 @@ import cartopy.feature as cfeature
 from pathlib import Path
 from classes.Predictand import Predictand
 import numpy as np
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import matplotlib.ticker as mticker
 sns.set()
 
 
@@ -82,7 +84,7 @@ class ExportVarPlot:
         self._create_dataset_from_var(variable, pred_t, significance)
         self.ds.to_netcdf(f'{self.directory_files}/{pred_t.var}_{self.predictor_names}_skill.nc')
 
-    def _save_skill_plot(self, variable: str, pred_t: Predictand, name: str, significance: np.ndarray):
+    def _save_skill_plot(self, variable: str, pred_t: Predictand, name: str, significance: np.ndarray, mean_skill: float):
         """
         save clusters into one plot using xarray library
         :param variable: precursor name
@@ -90,6 +92,7 @@ class ExportVarPlot:
         :param pred_t_corr_reshape: correlation 2d array of forecast and observation
         :param name: name of the precuror
         :param significance: 2d array of which point of the correlation are significant
+        :param mean_skill: mean value of significance array
         """
         self._save_variable(variable, pred_t, name, significance)
         # n_cols = max(n, 1)
@@ -99,10 +102,11 @@ class ExportVarPlot:
         self.ds[f"{pred_t.var}-{self.predictor_names}-skill"].plot(
             ax=ax,
             transform=ccrs.PlateCarree(),  # the data's projection
-            cmap=plt.cm.get_cmap('seismic', 51),
-            cbar_kwargs={'shrink': 0.8},
+            cmap=plt.cm.get_cmap('seismic', 31),
+            cbar_kwargs={'shrink': 0.8, 'label':f"{self.predictor_names}-skill"},
         )
-
+        lsize = 14
+        axislsize = 10
         ax.add_feature(cfeature.BORDERS, linewidth=0.1)
         ax.coastlines()
         ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
@@ -110,17 +114,30 @@ class ExportVarPlot:
         # "extent" attribute above will be ignored
         # ax.set_aspect("equal")
         ax.set_aspect(aspect=self.ds.dims["lon"] / self.ds.dims["lat"])
-        ax.set_title(f"{name}", fontsize=10)
-        ax.contourf(self.lons, self.lats, significance, levels=[ 0.,0.05, 0.5, 0.95, 1],
-                    hatches=["/////", ".....", None, None, None], colors='none', transform=ccrs.PlateCarree())
+
+        ax.set_title(f"{pred_t.var}-skill: {mean_skill:5.3f}",fontsize=14)
+        ax.contourf(self.lons, self.lats, significance, levels=[ 0.00, 0.05, 0.5, 0.95, 1],
+                    hatches=["oooo", "....", None, None, None], colors='none', transform=ccrs.PlateCarree())
                     # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
+
+        gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                          linewidth=0.1, color='gray', linestyle='--')
+        gl.xlabels_top = False
+        gl.ylabels_right = False
+        gl.xformatter = LONGITUDE_FORMATTER
+        gl.yformatter = LATITUDE_FORMATTER
+        gl.xlabel_style = {'size': axislsize, 'color': 'black'}
+        gl.ylabel_style = {'size': axislsize, 'color': 'black'}
+        gl.xlocator = mticker.FixedLocator([i for i in range(-180, 180, 30)])
+        gl.ylocator = mticker.FixedLocator([i for i in range(10, 100, 20)])
+
         self.logger.debug(f"Save in {self.directory_plots}/{pred_t.var}_skill.pdf")
         plt.savefig(f"{self.directory_plots}/{pred_t.var}_{self.predictor_names}_skill.png")
         plt.close()
 
     def save_plot_and_time_correlation(self, list_precursors: list, pred_t: Predictand,
                                        pred_t_corr_reshape: np.ndarray, significance: np.ndarray,
-                                       all_precs_names: list):
+                                       all_precs_names: list, mean_skill: float):
         """
         call functions to save and plot data
         :param list_precursors: list of precursors which should be plotted
@@ -128,6 +145,7 @@ class ExportVarPlot:
         :param pred_t_corr_reshape: correlation 2d array of forecast and observation
         :param significance: 2d array of which point of the correlation are significant
         :param all_precs_names: all possible precursors names
+        :param mean_skill: mean value of significance array
         """
         # define outputname
         if len(list_precursors) == 1:
@@ -140,4 +158,4 @@ class ExportVarPlot:
         self.directory_files = os.path.dirname(f"output-{self.output_label}/{pred_t.var} - {file_path}/files/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
-        self._save_skill_plot(pred_t_corr_reshape, pred_t, pred_t.var, significance)
+        self._save_skill_plot(pred_t_corr_reshape, pred_t, pred_t.var, significance, mean_skill)
