@@ -192,3 +192,7 @@ class TestInit(TestForecastNN):
         # forecast_nn of pattern correlation should be for each forecast_nn 1
         # hence sum of all forecasts should be identical to the length of the forecasts
         self.assertEqual(sum(self.pattern_corr_values), len(self.y_test[self.predictand.var]))
+
+
+if __name__=='__main__':
+    unittest.main()
