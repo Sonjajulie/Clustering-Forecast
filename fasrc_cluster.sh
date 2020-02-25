@@ -8,6 +8,7 @@
 #SBATCH -o %A-%j.o # Standard output
 #SBATCH -e %A-%j.e # Standard error
 
+# execute with: sbatch fasrc_cluster.sh
 
 ## Load required modules 
 ## https://www.rc.fas.harvard.edu/resources/documentation/software-on-the-cluster/python/
@@ -17,13 +18,13 @@ module load Anaconda3/5.0.1-fasrc02
 #cd /n/home04/stotz/DownloadClimateModelData
 
 #source local environment
-source activate download-climate-data
+source activate clustering-forecast
 
 ## execute with sbatch submit.sh
 # for i in {0..3}
 # do
 #    python3 main_cluster.py $i
 #done
-python3 test_forecast_nn.py
+python3 tests/test_forecast_nn.py
 
 source deactivate 
