@@ -1,31 +1,31 @@
 import unittest
 import numpy as np
-import random
 from classes.Predictand import Predictand
 from classes.Config import Config
 from classes.PredictandToyModel import PredictandToyModel
 from classes.Precursors import Precursors
 from classes.MixtureModel import MixtureGaussianModel
-from classes.Forecast import Forecast
+from classes.ForecastNN import ForecastNN
 from scipy import stats
 # 1.) create object of composite and cluster
 # 2.) create forecast_nn method with artificial data
 # 3.)
 
-class TestForecast(unittest.TestCase):
+
+class TestForecastNN(unittest.TestCase):
     """ Create test class for Forcast"""
     def setUp(self):
         """initialize class cluster and composites"""
         # cluster
-        cl_inifile = "/home/sonja/Documents/Clustering-Forecast/ini/clusters_America_prec_t.ini"
+        cl_inifile = "/home/sonja/Documents/Clustering-Forecast/ini/clusters_America_prec_t_test.ini"
         cl_output_path = "/home/sonja/Documents/Clustering-Forecast/tests/"
         cl_output_label = "TEST"
         cl_config = Config("Test.log")
         self.predictand = Predictand(cl_inifile, cl_output_path, cl_output_label, cl_config.config_dict)
         # composite
         co_inifile = "/home/sonja/Documents/Clustering-Forecast/ini/composites_America_PSL.ini"
-        co_output_path =  "/home/sonja/Documents/Clustering-Forecast/tests/"
-        co_output_label =  "TEST"
+        co_output_path = "/home/sonja/Documents/Clustering-Forecast/tests/"
+        co_output_label = "TEST"
         co_config = Config("Test.log")
         self.precursors = Precursors(co_inifile, co_output_path, co_output_label, co_config.config_dict)
 
@@ -34,7 +34,7 @@ class TestForecast(unittest.TestCase):
         self.k = 2
         self.predictand_var = "prec_t"
         # initialize Forecast class
-        self.forecast = Forecast(cl_inifile, cl_config.config_dict, self.k, self.method_name)
+        self.forecast_nn = ForecastNN(cl_inifile, cl_config.config_dict, self.k, self.method_name)
 
         self.initialize_data()
 
@@ -68,29 +68,33 @@ class TestForecast(unittest.TestCase):
         self.predictand.dict_pred_1D[self.predictand.var] = self.y
 
         # set data to precursors input data
-        self.precursors.dict_precursors["snow"] = self.X[:,:2]
-        self.precursors.dict_standardized_precursors["snow"] = self.X[:,:2]
-        self.precursors.dict_prec_1D["snow"] = self.X[:,:2]
-        self.precursors.dict_precursors["ice"] = self.X[:,2:]
-        self.precursors.dict_standardized_precursors["ice"] = self.X[:,2:]
-        self.precursors.dict_prec_1D["ice"] = self.X[:,2:]
-
+        self.precursors.dict_precursors["snow"] = self.X[:, :2]
+        self.precursors.dict_standardized_precursors["snow"] = self.X[:, :2]
+        self.precursors.dict_prec_1D["snow"] = self.X[:, :2]
+        self.precursors.dict_precursors["ice"] = self.X[:, 2:]
+        self.precursors.dict_standardized_precursors["ice"] = self.X[:, 2:]
+        self.precursors.dict_prec_1D["ice"] = self.X[:, 2:]
 
         self.precursors.dict_standardized_precursors.pop("PSL")
         self.precursors.dict_prec_1D.pop("PSL")
         self.precursors.dict_precursors.pop("PSL")
         # Create train and test dataset with an 66:33 split
-        self.y_train, self.X_train, self.y_test, self.X_test = self.train_test_split_pred(self.predictand, self.precursors,
-                                                                      test_size=0.66, random_state=2019)
+        self.y_train, self.X_train, self.y_test, self.X_test = self.train_test_split_pred(self.predictand,
+                                                                                          self.precursors,
+                                                                                          test_size=0.66,
+                                                                                          random_state=2019)
 
-    def train_test_split_pred(self, predictand, precursors, test_size=0.66, random_state=2019):
+    @staticmethod
+    def train_test_split_pred(predictand, precursors, test_size=0.66, random_state=2019):
         np.random.seed(random_state)
         len_predicts = len(predictand.dict_pred_1D[predictand.var])
         len_test_data = int(len_predicts * test_size)
         selected_time_steps = np.random.choice(len_predicts, len_test_data, replace=False)
         y_train = {}
+        # noinspection PyPep8Naming
         X_train = {}
         y_test = {}
+        # noinspection PyPep8Naming
         X_test = {}
 
         for i in range(len_predicts):
@@ -110,34 +114,36 @@ class TestForecast(unittest.TestCase):
 
         # Calculate composites
         self.precursors.get_composites_data_1d_train_test(self.X_train, self.predictand.f, self.k, self.method_name,
-                                                     self.predictand_var)
+                                                          self.predictand_var)
 
     def calculate_forecast(self):
         """calculate forecast_nn using toy model data"""
         self.calculate_clusters_and_composites()
-        self.forecast.list_precursors_all = ["snow", "ice"]
-        self.forecast.list_precursors_combinations = [["snow"], ["ice"], ["snow", "ice"]]
+        self.forecast_nn.list_precursors_all = ["snow", "ice"]
+        self.forecast_nn.list_precursors_combinations = [["snow"], ["ice"], ["snow", "ice"]]
 
-        self.forecast_data = np.zeros((len(self.y_test[self.predictand.var]), self.predictand.dict_pred_1D[f"{self.predictand.var}"].shape[1]))
+        # for this test purpose we take both precursors
+        #train model using training data
+        self.forecast_nn.train_nn(self.forecast_nn.list_precursors_all, self.predictand.clusters, self.precursors.dict_composites, self.X_train,
+                                  self.y_train[self.predictand_var])
 
+        self.forecast_data = np.zeros((len(self.y_test[self.predictand.var]), self.predictand.dict_pred_1D[
+        f"{self.predictand.var}"].shape[1]))
+        # Calculate forecast_nn for all years
+        self.pattern_corr_values = []
+        # Prediction
+        for year in range(len(self.y_test[self.predictand.var])):  # len(y_test[predictand.var])):
+            forecast_temp = self.forecast_nn.prediction_nn(self.forecast_nn.list_precursors_all,
+                                                           self.predictand.clusters, self.precursors.dict_composites,
+                                                           self.X_test, year)
+            # Assign forecast_nn data to array
+            self.forecast_data[year] = forecast_temp
 
-        # go through different precursors
-        for forecast_predictands in self.forecast.list_precursors_combinations:
-            # Calculate forecast_nn for all years
-            self.forecast.list_precursors = forecast_predictands
-            self.pattern_corr_values = []
-            # Prediction
-            for year in range(len(self.y_test[self.predictand.var])):  # len(y_test[predictand.var])):
-                forecast_temp = self.forecast.prediction(self.predictand.clusters, self.precursors.dict_composites,
-                                                         self.X_test, year)
-                # Assign forecast_nn data to array
-                self.forecast_data[year] = forecast_temp
+            # Calculate pattern correlation
+            self.pattern_corr_values.append(round(stats.pearsonr(self.forecast_data[year],
+                                                  self.y_test[self.predictand.var][year])[0]))
 
-                # Calculate pattern correlation
-                self.pattern_corr_values.append(round(stats.pearsonr(self.forecast_data[year],
-                                                          self.y_test[self.predictand.var][year])[0]))
-
-        # Calculate time correlation for each point
+        # Round data for correlation analysis
         for j in range(len(self.y_test[self.predictand.var])):
             for i in range(len(self.y_test[self.predictand.var][j])):
                 self.y_test[self.predictand.var][j][i] = round(self.y_test[self.predictand.var][j][i])
@@ -160,7 +166,7 @@ class TestForecast(unittest.TestCase):
         self.predictand._set_clusters_1d()
 
 
-class TestInit(TestForecast):
+class TestInit(TestForecastNN):
     def test_initial_precursors_predictand_names(self):
         # First calculate clusters and composites and then check keys
         self.calculate_clusters_and_composites()
@@ -170,58 +176,19 @@ class TestInit(TestForecast):
 
     def test_calculate_forecast_results(self):
         """ test whether toy model results lead to 100% forecast_nn"""
+
         self.calculate_forecast()
         self.time_correlation, self.significance = \
-            self.forecast.calculate_time_correlation(np.array(self.y_test[self.predictand.var], dtype=int),
-                                                     np.array(self.forecast_data, dtype=int), 1)
+            self.forecast_nn.calculate_time_correlation(np.array(self.y_test[self.predictand.var], dtype=int),
+                                                        np.array(self.forecast_data, dtype=int), 1, True)
         self.expected_time_correlation = [1, 1, 1]
         self.expected_significance = [0, 0, 0]
+        # noinspection PyTypeChecker
         self.assertListEqual(np.around(self.time_correlation, decimals=0).astype('int').tolist(),
                              self.expected_time_correlation)
+        # noinspection PyTypeChecker
         self.assertListEqual(np.around(self.significance, decimals=0).astype('int').tolist(),
                              self.expected_significance)
         # forecast_nn of pattern correlation should be for each forecast_nn 1
         # hence sum of all forecasts should be identical to the length of the forecasts
         self.assertEqual(sum(self.pattern_corr_values), len(self.y_test[self.predictand.var]))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

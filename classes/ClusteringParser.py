@@ -6,7 +6,7 @@ class ClusteringParser:
     """ For parsing variables in command line"""
     def __init__(self):
         self.parser = argparse.ArgumentParser(
-            description='For the Calculation of clusters, composites and forecast algorithm, '
+            description='For the Calculation of clusters, composites and forecast_nn algorithm, '
                         'inifile, variables and length of files are needed to be specified '
                         ' via command line')
         self.parser.add_argument('-ini', '--inifile', required=True,

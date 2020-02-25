@@ -58,7 +58,7 @@ class ExportVarPlot:
         """
         create dataset for clusters as netcdf using xarray library
         :param variable: precursor name
-        :param pred_t: object of class Predictand, where the forecast and significance shall be plotted
+        :param pred_t: object of class Predictand, where the forecast_nn and significance shall be plotted
         :param significance: 2d array of which point of the correlation are significant
         """
         self.logger.info("create dataset for variable")
@@ -75,8 +75,8 @@ class ExportVarPlot:
         """
         save clusters using xarray
         :param variable: precursor name
-        :param pred_t: object of class Predictand, where the forecast and significance shall be plotted
-        :param pred_t_corr_reshape: correlation 2d array of forecast and observation
+        :param pred_t: object of class Predictand, where the forecast_nn and significance shall be plotted
+        :param pred_t_corr_reshape: correlation 2d array of forecast_nn and observation
         :param name: name of the precuror
         :param significance: 2d array of which point of the correlation are significant
         """
@@ -88,8 +88,8 @@ class ExportVarPlot:
         """
         save clusters into one plot using xarray library
         :param variable: precursor name
-        :param pred_t: object of class Predictand, where the forecast and significance shall be plotted
-        :param pred_t_corr_reshape: correlation 2d array of forecast and observation
+        :param pred_t: object of class Predictand, where the forecast_nn and significance shall be plotted
+        :param pred_t_corr_reshape: correlation 2d array of forecast_nn and observation
         :param name: name of the precuror
         :param significance: 2d array of which point of the correlation are significant
         :param mean_skill: mean value of significance array
@@ -141,8 +141,8 @@ class ExportVarPlot:
         """
         call functions to save and plot data
         :param list_precursors: list of precursors which should be plotted
-        :param pred_t: object of class Predictand, where the forecast and significance shall be plotted
-        :param pred_t_corr_reshape: correlation 2d array of forecast and observation
+        :param pred_t: object of class Predictand, where the forecast_nn and significance shall be plotted
+        :param pred_t_corr_reshape: correlation 2d array of forecast_nn and observation
         :param significance: 2d array of which point of the correlation are significant
         :param all_precs_names: all possible precursors names
         :param mean_skill: mean value of significance array

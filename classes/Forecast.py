@@ -14,11 +14,10 @@ from scipy import stats
 from itertools import combinations
 
 
-
 class Forecast:
     def __init__(self, inifile_in: str, cl_config: dict, k=8, method_name="ward"):
         """
-        Initialize Forecast--> read forecast parameters using ini-file
+        Initialize Forecast--> read forecast_nn parameters using ini-file
         :param inifile_in: file for initialization of variable
         :param cl_config: dictionary, where all information of logger is stored from classes/config
         :param k: number of clusters
@@ -36,13 +35,15 @@ class Forecast:
         self.t_corr_arr = None
         self.t_corr_signif_arr = None
         self.list_precursors_all = []
+        self.list_precursors_combinations = []
+        self.all_combinations = None
 
         # initialize list of possible precursors according to k and method_name
         self._get_forecast_parameters(k, method_name)
 
     def _get_forecast_parameters(self, k: int, method_name: str):
         """
-        load all forecast parameters and save composites which should be saved
+        load all forecast_nn parameters and save composites which should be saved
         :param k: number of clusters
         :param method_name: method for clustering data
         """
@@ -50,20 +51,21 @@ class Forecast:
         self.k = k
         self.config = configparser.ConfigParser()
         self.config.read(self.inifile)
-        # get begin and end time for forecast from ini file
+        # get begin and end time for forecast_nn from ini file
         self.beg_year = int(self.config["Forecast-Parameters"]["begin"])
         # assert self.beg_year >= 1967, \
-        #     logger.error(f"Start year of forecast must be 1967 or higher! It is {self.beg_year}")
+        #     logger.error(f"Start year of forecast_nn must be 1967 or higher! It is {self.beg_year}")
         self.end_year = int(self.config["Forecast-Parameters"]["end"])
         self.diff = self.end_year - self.beg_year
         assert self.diff > 0, \
-            self.logger.error(f"end year of forecast must be greater than start year! It is {self.end_year}")
-        # Select from saveArray which precursors should be used to calculate forecast
-        # self.list_precursors = ast.literal_eval(config.get("Forecast-Parameters", "forecastprecs"))
+            self.logger.error(f"end year of forecast_nn must be greater than start year! It is {self.end_year}")
+        # Select from saveArray which precursors should be used to calculate forecast_nn
+        self.list_precursors = ast.literal_eval(self.config.get("Forecast-Parameters", "forecastprecs"))
+
         self.list_precursors_all = ast.literal_eval(self.config.get("Forecast-Parameters", "forecastprecs"))
         self.plot = self.config["Forecast-Parameters"]["plot"]
         self.all_combinations = self.config["Forecast-Parameters"]["all_combinations"]
-        self.list_precursors_combinations = []
+
         if self.all_combinations:
             for r in range(len(self.list_precursors_all)):
                 [self.list_precursors_combinations
@@ -71,8 +73,9 @@ class Forecast:
         else:
             self.list_precursors = self.list_precursors_all
 
-    def prediction_train_test(self, clusters_1d: dict, composites_1d: dict, X_test: np.ndarray, year):
-        """make forecast
+    # noinspection PyPep8Naming
+    def prediction_train_test(self, clusters_1d: dict, composites_1d: dict, X_test: dict, year):
+        """make forecast_nn
         :param clusters_1d: dict of all k-clusters
         :param composites_1d: dict of composites with time and one-dimensional array
         :param X_test: np.ndarray with all the train data of precursors
@@ -93,7 +96,7 @@ class Forecast:
         return self.forecast_var
 
     def prediction(self, clusters_1d: dict, composites_1d: dict, data_year_1d: dict, year: int):
-        """make forecast
+        """make forecast_nn
         :param clusters_1d: dict of all k-clusters
         :param composites_1d: dict of composites with time and one-dimensional array
         :param data_year_1d: np.ndarray with all  data of precursors
@@ -139,11 +142,13 @@ class Forecast:
 
         return np.dot(self.pinv_matrix, rhs)
 
-    def calculate_time_correlation(self, data_1d: np.ndarray, forecast_data: np.ndarray, time_start_file: int):
-        """calculate time correlation for given forecast data
+    def calculate_time_correlation(self, data_1d: np.ndarray, forecast_data: np.ndarray, time_start_file: int,
+                                   debug=False):
+        """calculate time correlation for given forecast_nn data
         :param forecast_data: list of forecasted data
         :param data_1d: list of obervational data which shoud be forecasted
         :type time_start_file: int
+        :type debug: whether it is a test case or not
         """
         self.t_corr_arr = np.zeros((forecast_data.shape[1]))
         self.t_corr_signif_arr = np.zeros((forecast_data.shape[1]))
@@ -153,9 +158,9 @@ class Forecast:
             # check whether value in data range does not change, but has same value as observational data
             # because then it is still correct even though there is no curve --> only for debug
             # normally these are areas which are not considered in the analys as continents for sst
-            if all(data_1d[start_obs:end_end, i] == forecast_data[0:self.diff, i]) and \
-                    data_1d[start_obs:end_end, i][0] == 0:
-                self.t_corr_arr[i] =1
+            # noinspection PyTypeChecker
+            if debug and all(data_1d[start_obs:end_end, i] == forecast_data[0:self.diff, i]):
+                self.t_corr_arr[i] = 1
                 self.t_corr_signif_arr[i] = 0
             else:
                 t_corr = stats.pearsonr(forecast_data[0:self.diff, i], data_1d[start_obs:end_end, i])
@@ -168,11 +173,10 @@ class Forecast:
 
         return self.t_corr_arr, self.t_corr_signif_arr
 
-    def calculate_time_correlation_all_times(self, data_1d: np.ndarray, forecast_data: np.ndarray, time_start_file: int):
-        """calculate time correlation for given forecast data for all times --> easier function for model data
+    def calculate_time_correlation_all_times(self, data_1d: np.ndarray, forecast_data: np.ndarray):
+        """calculate time correlation for given forecast_nn data for all times --> easier function for model data
         :param forecast_data: list of forecasted data
         :param data_1d: list of obervational data which shoud be forecasted
-        :type time_start_file: int
         """
         self.t_corr_arr = np.zeros((forecast_data.shape[1]))
         self.t_corr_signif_arr = np.zeros((forecast_data.shape[1]))

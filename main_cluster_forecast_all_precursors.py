@@ -49,7 +49,7 @@ def train_test_split_pred(predictand, precursors, data_range, train_size=0.66, r
 
 
 def main(cl_parser: ClusteringParser, cl_config: dict):
-    logger.info("Start forecast model")
+    logger.info("Start forecast_nn model")
 
     # load inifile according to variable
     # var = cl_parser.arguments['predictand'] # not needed anymore, because total inifile is given
@@ -60,7 +60,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     predictand = Predictand(inifile, output_path, output_label, cl_config)
     dict_skills_pattern = {}
 
-    # load forecast-parameters
+    # load forecast_nn-parameters
     method_name = 'ward'
     k = 5
     forecast = Forecast(inifile, cl_config, k, method_name)
@@ -78,14 +78,14 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # Calculate composites
     precursors.get_composites_data_1d_train_test(X_train, predictand.f, forecast.k, forecast.method_name,
                                                  predictand.var)
-    precursors.plot_composites(k)
+    # precursors.plot_composites(k, 1)
     # subtract train mean also for test data
-    # for prec in forecast.list_precursors_all:
+    # for prec in forecast_nn.list_precursors_all:
     #     X_test[prec] -= precursors.varmean
     # y_test[predictand.var] -= predictand.varmean
 
     for forecast_predictands in forecast.list_precursors_combinations:
-        # Calculate forecast for all years
+        # Calculate forecast_nn for all years
         forecast.list_precursors = forecast_predictands
         pattern_corr_values = []
         # Prediction
@@ -97,7 +97,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
             # print(year)
             forecast_temp = forecast.prediction(predictand.clusters, precursors.dict_composites, X_test, year)
 
-            # Assign forecast data to array
+            # Assign forecast_nn data to array
             forecast_data[year] = forecast_temp
 
             # Calculate pattern correlation
@@ -108,8 +108,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
         # Calculate time correlation for each point
         time_correlation, significance = forecast.calculate_time_correlation_all_times(
-            np.array(y_test[f"{predictand.var}"]),
-            forecast_data, predictand.time_start_file)
+            np.array(y_test[f"{predictand.var}"]), forecast_data)
 
         # Reshape correlation maps
         pred_t_corr_reshape = np.reshape(time_correlation, (predictand.dict_predict[predictand.var].shape[1],
@@ -127,7 +126,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
             ex.save_plot_and_time_correlation(forecast.list_precursors, predictand, pred_t_corr_reshape,
                                               significance_corr_reshape, forecast.list_precursors_all, np.nanmean(pred_t_corr_reshape))
             dict_skills_pattern[ex.predictor_names] = {'time correlation':  np.nanmean(pred_t_corr_reshape),
-                                                       'pattern correlation': np.nanmean(pred_t_corr_reshape)}
+                                                       'pattern correlation': np.nanmean(pattern_corr_values)}
     if forecast.plot:
         with open(f'{output_path}/output-{output_label}/skill_correlation-{predictand.var}.json', 'w') as fp:
             json.dump(dict_skills_pattern, fp)

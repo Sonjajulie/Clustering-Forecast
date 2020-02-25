@@ -17,13 +17,13 @@ from classes.Config import Config
 
 
 def main(cl_parser: ClusteringParser, cl_config: dict):
-    logger.info("Start forecast model")
+    logger.info("Start forecast_nn model")
 
     # load inifile according to variable
     inifile = cl_parser.arguments['inifile']
     output_label = cl_parser.arguments['outputlabel']
     predictand = Predictand(inifile, output_label, cl_config)
-    # load forecast-parameters
+    # load forecast_nn-parameters
     method_name = 'ward'
     k = 5
     forecast = Forecast(inifile, cl_config, k, method_name)
@@ -36,8 +36,8 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     precursors = Precursors(inifile, output_label, cl_config)
     all_precs_names = [x for x in precursors.dict_precursors.keys()]
 
-    # Calculate forecast for all years
-    for year in range(int(forecast.beg_year), int(forecast.beg_year) + 3):  # int(forecast.end_year)
+    # Calculate forecast_nn for all years
+    for year in range(int(forecast.beg_year), int(forecast.beg_year) + 3):  # int(forecast_nn.end_year)
 
         # Calculate clusters of precursors for var, by removing one year
         predictand.calculate_clusters_year(forecast.method_name, forecast.k, year - forecast.beg_year)
@@ -50,7 +50,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
         forecast_temp = forecast.prediction(predictand.clusters, precursors.dict_composites,
                                             precursors.dict_prec_1D, year - forecast.beg_year)
 
-        # Assign forecast data to array
+        # Assign forecast_nn data to array
         forecast_data[year - forecast.beg_year] = forecast_temp
 
         # Calculate pattern correlation
