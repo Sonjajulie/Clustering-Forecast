@@ -39,9 +39,6 @@ def wrapper_function_cluster_loss(clusters_1d: np.array, observations: np.array,
     :param k: number of clusters
     :param batch_size_in: size of batches, normally 32
     Problem is that keras accept only functions that have y_pred and y_true as arguments
-    according to website:
-    https://towardsdatascience.com/advanced-keras-constructing-complex-custom-losses-and-metrics-c07ca130a618
-    https://stackoverflow.com/questions/45961428/make-a-custom-loss-function-in-keras
     """
 
     def loss(y_true, y_pred):
@@ -65,12 +62,10 @@ def wrapper_function_cluster_loss(clusters_1d: np.array, observations: np.array,
             observations_year = tf.convert_to_tensor(observations, np.float32)[index]
             # create tensorflow array with dimension of len(observations_year)
             pred = tf.zeros(shape=tf.shape(observations_year), dtype="float32")
-            # https://stackoverflow.com/questions/52816938/how-to-convert-numpy-array-to-keras-tensor
             clusters_1d_tf = tf.convert_to_tensor(clusters_1d, np.float32)
 
             # go through for-loop and add y_pred to tensorflow array
             for i in range(int(k)):
-                # https://stackoverflow.com/questions/35146444/tensorflow-python-accessing-individual-elements-in-a-tensor
                 cluster_i = tf.gather(clusters_1d_tf, i)
                 y_pred_projection_beta = y_pred[i_batch_body, i]
                 pred = pred + y_pred_projection_beta * cluster_i
@@ -87,11 +82,9 @@ def wrapper_function_cluster_loss(clusters_1d: np.array, observations: np.array,
         cl_loss = tf.constant(0.)
         i_batch = tf.constant(0, dtype=np.int32)
         # call tf.while_loop according to the website:
-        # https://stackoverflow.com/questions/37441140/how-to-use-tf-while-loop-in-tensorflow
         i_batch, batch_size, result = tf.while_loop(condition, body, [i_batch, batch_size, cl_loss])
 
         # tf.print("result:", [tf.shape(result), result], output_stream=sys.stdout)
-        # https://stackoverflow.com/questions/50590061/different-types-of-divisions-in-tensorflow
         # tf.truediv enforces python v3 division semantics
         return tf.truediv(result, tf.dtypes.cast(batch_size, tf.float32))
 
@@ -222,7 +215,7 @@ class ForecastNN(Forecast):
         # ,callbacks = [checkpoint]
 
         out = self.model.fit(self.alphas_train, self.y_train_pseudo,
-                             validation_data=(self.alphas_val, self.y_val_pseudo), epochs=800,
+                             validation_data=(self.alphas_val, self.y_val_pseudo), epochs=300,
                              batch_size=self.batch_size, verbose=0)  #
         # , epochs=500, batch_size=30, verbose=0, callbacks=[mcp]verbose=0)
 
@@ -236,11 +229,12 @@ class ForecastNN(Forecast):
             plt.figure(1, figsize=(12, 6))
             plt.clf()
             plt.plot(self.model.history.history['loss'])
-            plt.title("Model's Training & Validation loss across epochs")
+            plt.plot(self.model.history.history['val_loss'])
+            plt.title("Model's Training & Validation mean squared error across epochs")
             plt.ylabel('Loss')
             plt.xlabel('Epochs')
-            plt.legend(['Train'], loc='upper right')
-            plt.savefig(f"Loss_function_wr_cl_loss_{self.nr_neurons}_neurons.pdf", bbox_inches='tight')
+            plt.legend(['Train', 'Validation'], loc='upper right')
+            plt.savefig(f"Loss_function_wr_cl_loss_{self.nr_neurons}_neurons_{self.k}_cluster_{forecast_predictands}.pdf", bbox_inches='tight')
 
     def prediction_nn(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, data_year_1d: dict,
                       year: int):

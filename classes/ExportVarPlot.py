@@ -117,7 +117,7 @@ class ExportVarPlot:
 
         ax.set_title(f"{pred_t.var}-skill: {mean_skill:5.3f}",fontsize=14)
         ax.contourf(self.lons, self.lats, significance, levels=[ 0.00, 0.05, 0.5, 0.95, 1],
-                    hatches=["oooo", "....", None, None, None], colors='none', transform=ccrs.PlateCarree())
+                    hatches=["////", "....", None, None, None], colors='none', transform=ccrs.PlateCarree())
                     # hatches=["/////", ".....", ",,,,,", "/////", "....."], colors='none', transform=ccrs.PlateCarree())
 
         gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,

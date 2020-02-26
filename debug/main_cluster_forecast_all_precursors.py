@@ -39,7 +39,7 @@ def train_test_split_pred(predictand, precursors, test_size=0.66, random_state=2
 
 
 def main(cl_parser: ClusteringParser, cl_config: dict):
-    logger.info("Start forecast model")
+    logger.info("Start forecast_nn model")
 
     # load inifile according to variable
     # var = cl_parser.arguments['predictand'] # not needed anymore, because total inifile is given
@@ -48,7 +48,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     output_path = cl_parser.arguments['outputpath']
     predictand = Predictand(inifile, output_path, output_label, cl_config)
 
-    # load forecast-parameters
+    # load forecast_nn-parameters
     method_name = 'ward'
     k = 5
     forecast = Forecast(inifile, cl_config, k, method_name)
@@ -71,15 +71,15 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
                                                  predictand.var)
     precursors.plot_composites(k)
 
-    # for forecast_predictands in forecast.list_precursors_combinations:
-    #     # Calculate forecast for all years
-    #     forecast.list_precursors = forecast_predictands
+    # for forecast_predictands in forecast_nn.list_precursors_combinations:
+    #     # Calculate forecast_nn for all years
+    #     forecast_nn.list_precursors = forecast_predictands
     #     # Prediction
     #     for year in range(5):  # len(y_test[predictand.var])):
     #         print(year)
-    #         forecast_temp = forecast.prediction(predictand.clusters, precursors.dict_composites, X_test, year)
+    #         forecast_temp = forecast_nn.prediction(predictand.clusters, precursors.dict_composites, X_test, year)
     #
-    #         # Assign forecast data to array
+    #         # Assign forecast_nn data to array
     #         forecast_data[year] = forecast_temp
     #
     #         # Calculate pattern correlation
@@ -87,7 +87,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     #                                                   predictand.dict_standardized_pred_1D[f"{predictand.var}"][year])[0])
     #
     #     # Calculate time correlation for each point
-    #     time_correlation, significance = forecast.calculate_time_correlation(
+    #     time_correlation, significance = forecast_nn.calculate_time_correlation(
     #         predictand.dict_standardized_pred_1D[f"{predictand.var}"],
     #         forecast_data, predictand.time_start_file)
     #
@@ -101,11 +101,11 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     #     logger.info(f'pattern correlation: {np.nanmean(pattern_corr_values)}')
     #
     #     # Plot correlation map, if specified in ini-file
-    #     if forecast.plot:
+    #     if forecast_nn.plot:
     #         logger.info("Plot and save variables")
     #         ex = ExportVarPlot(output_label, cl_config)
-    #         ex.save_plot_and_time_correlation(forecast.list_precursors, predictand, pred_t_corr_reshape,
-    #                                           significance_corr_reshape, forecast.list_precursors_all)
+    #         ex.save_plot_and_time_correlation(forecast_nn.list_precursors, predictand, pred_t_corr_reshape,
+    #                                           significance_corr_reshape, forecast_nn.list_precursors_all)
 
 
 if __name__ == '__main__':
