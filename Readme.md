@@ -4,23 +4,6 @@ Clustering Forecast
 
 Python version: python 3.7
 
-
-### Library Requirements:
- - numpy
- - netCDF4
- - scipy
- - matplotlib
- - xarrar
- - configparser
- - seaborn
- - pandas
- - logging
- - cartopy
- - os
- - cftime
- - pathlib
- - pickle
- 
  
 ###  Create masks:
 For the clustering forecast algorithm masks must be written in asci-code.
