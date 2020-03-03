@@ -63,7 +63,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # load forecast_nn-parameters
     method_name = 'ward'
     k = 5
-    forecast_nn = ForecastNN(inifile, cl_config, k, method_name)
+    forecast_nn = ForecastNN(inifile, output_path, output_label, cl_config, predictand.var, k, method_name)
     logger.info("Clusters: " + str(forecast_nn.k))
 
     # load precursors

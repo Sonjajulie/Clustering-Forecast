@@ -308,7 +308,7 @@ class Clusters:
         self.varAnom = self.dict_pred_1D[label] - self.varmean
         # divided by grid (1d-Array) and years - 1 (the year which we would like to forecast_nn)
         # standardize
-        if self.output_label == "standardized":
+        if self.output_label == "standardized" or self.output_label == "standardized-opt":
             self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
             self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var
         else:
@@ -368,8 +368,10 @@ class Clusters:
     def plot_years(self):
         """
         Plot each year of variable
+
         """
-        self._set_directory_plots(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
+        # {self.output_path}
+        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/years/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
 
@@ -447,10 +449,11 @@ class Clusters:
         """
         Plot variable for each model and each time point as mean
         """
-        self._set_directory_plots(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
+        # {self.output_path}/
+        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
+        self._set_directory_files(f"output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
         time1 = self.dict_predict[self.var].coords["time"].values
@@ -713,7 +716,7 @@ class Clusters:
             # ax.set_aspect("equal")
             ax.set_title(f"RMS", fontsize=10)
         # set directories for plots and files
-        self._set_directory_plots(f"output/{self.var}/Cluster/")
+        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
         self.logger.debug(f"Save in {self.directory_plots}/rms.pdf")
         plt.savefig(f"{self.directory_plots}/rms.pdf")

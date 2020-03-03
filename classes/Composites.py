@@ -284,12 +284,12 @@ class Composites:
         self._set_cluster_frequency(f)
         for prec in self.dict_precursors.keys():
             self._create_composites(prec, f, k, method_name, predictand)
-
-            self.directories_plots[self.var] = f"{self.output_path}/output-{self.output_label}/" \
+            # {self.output_path}/
+            self.directories_plots[self.var] = f"output-{self.output_label}/" \
                                                f"/{predictand}/Composites/{self.var}/" \
                                                f"{method_name}_Composite_{k}/plots/"
             Path(self.directories_plots[self.var]).mkdir(parents=True, exist_ok=True)
-            self.directories_files[self.var] = f"{self.output_path}/output-{self.output_label}/{predictand}" \
+            self.directories_files[self.var] = f"output-{self.output_label}/{predictand}" \
                                                f"/Composites/{self.var}/{method_name}_Composite_{k}/files/"
             Path(self.directories_files[self.var]).mkdir(parents=True, exist_ok=True)
 
@@ -302,7 +302,7 @@ class Composites:
         self.logger.info("Calculate Standardized values")
         self.varmean = np.mean(self.dict_prec_1D_var[label], axis=0)
         self.varAnom = self.dict_prec_1D_var[label] - self.varmean
-        if self.output_label == "standardized":
+        if self.output_label == "standardized" or self.output_label == "standardized-opt":
             self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
             self.dict_standardized_precursors_var[label] = self.varAnom / self.sigma_var
         else:
