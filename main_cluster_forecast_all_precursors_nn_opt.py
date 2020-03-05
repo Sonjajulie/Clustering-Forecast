@@ -13,7 +13,8 @@ from classes.ExportVarPlot import ExportVarPlot
 from classes.ClusteringParser import ClusteringParser
 from classes.Config import Config
 from scipy import stats
-import json
+import pandas as pd
+import os  # needed for loop over files
 
 
 def train_test_split_pred(predictand, precursors, data_range, train_size=0.66, random_state=2019):
@@ -83,94 +84,108 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # for prec in forecast_nn.list_precursors_all:
     #     X_test[prec] -= precursors.varmean
     # y_test[predictand.var] -= predictand.varmean
-
+    # df_parameters_opt = pd.DataFrame(columns=["precursor", "nr_neurons", "opt_method", "nr_epochs", "nr_layers", "lr_rate",
+    #                                           "nr_batch_size", "time_correlation", "pattern_correlation"])
+    index_df = 0
+    nr_epochs = 200
     for forecast_predictands in forecast_nn.list_precursors_combinations:
         # Calculate forecast_nn for all years
         forecast_nn.list_precursors = forecast_predictands
-        for nr_neurons in range(3, 10, 1):
-            for opt_method in ["Adam", "SGD", "Adamax", "Nadam"]:
-                for nr_epochs in [500, 600, 900, 1000]:
+        for opt_method in ["Adam", "SGD", "Adamax", "Nadam"]:
+            for nr_batch_size in [8, 16, 32, 64]:
+                for lr_rate in [0.1, 0.01, 0.001, 0.0001]:
                     for nr_layers in range(3, 10, 1):
-                        for lr_rate in [0.1, 0.01, 0.001, 0.0001]:
-                            for nr_batch_size in [8, 16, 32, 64]:
-                                # train small NN
-                                forecast_nn.train_nn_opt(forecast_nn.list_precursors, predictand.clusters,
-                                                         precursors.dict_composites, X_train,
-                                                         y_train[f"{predictand.var}"], nr_neurons, opt_method,
-                                                         nr_epochs, nr_layers,
-                                                         lr_rate, nr_batch_size)
+                        for nr_neurons in [forecast_nn.k, 8, 16, 32]:
+                            # train small NN
+                            forecast_nn.train_nn_opt(forecast_nn.list_precursors, predictand.clusters,
+                                                     precursors.dict_composites, X_train,
+                                                     y_train[f"{predictand.var}"], nr_neurons, opt_method,
+                                                     nr_epochs, nr_layers,
+                                                     lr_rate, nr_batch_size)
 
-                                # Calculate forecast_nn for all years
-                                pattern_corr_values = []
+                            # Calculate forecast_nn for all years
+                            pattern_corr_values = []
 
-                                # Prediction
-                                forecast_data = np.zeros((len(y_test[f"{predictand.var}"]),
-                                                          predictand.dict_pred_1D[f"{predictand.var}"].shape[1]))
-                                logger.info(forecast_predictands)
+                            # Prediction
+                            forecast_data = np.zeros((len(y_test[f"{predictand.var}"]),
+                                                      predictand.dict_pred_1D[f"{predictand.var}"].shape[1]))
+                            logger.info(forecast_predictands)
 
-                                for year in range(len(y_test[predictand.var])):  # len(y_test[predictand.var])):
-                                    print(year)
-                                    forecast_temp = forecast_nn.prediction_nn(forecast_nn.list_precursors_all,
-                                                                              predictand.clusters,
-                                                                              precursors.dict_composites, X_test, year)
-                                    # Assign forecast_nn data to array
-                                    forecast_data[year] = forecast_temp
+                            for year in range(len(y_test[predictand.var])):  # len(y_test[predictand.var])):
+                                print(year)
+                                forecast_temp = forecast_nn.prediction_nn(forecast_nn.list_precursors_all,
+                                                                          predictand.clusters,
+                                                                          precursors.dict_composites, X_test, year)
+                                # Assign forecast_nn data to array
+                                forecast_data[year] = forecast_temp
 
-                                    # Calculate pattern correlation
-                                    pattern_corr_values.append(
-                                        stats.pearsonr(forecast_temp, y_test[f"{predictand.var}"][year])[0])
+                                # Calculate pattern correlation
+                                pattern_corr_values.append(
+                                    stats.pearsonr(forecast_temp, y_test[f"{predictand.var}"][year])[0])
 
-                                # Calculate time correlation for each point
-                                time_correlation, significance = forecast_nn.calculate_time_correlation_all_times(
-                                    np.array(y_test[f"{predictand.var}"]), forecast_data)
+                            # Calculate time correlation for each point
+                            time_correlation, significance = forecast_nn.calculate_time_correlation_all_times(
+                                np.array(y_test[f"{predictand.var}"]), forecast_data)
 
-                                # Reshape correlation maps
-                                pred_t_corr_reshape = np.reshape(time_correlation,
-                                                                 (predictand.dict_predict[predictand.var].shape[1],
-                                                                  predictand.dict_predict[predictand.var].shape[2]))
-                                significance_corr_reshape = np.reshape(significance, (
-                                    predictand.dict_predict[predictand.var].shape[1],
-                                    predictand.dict_predict[predictand.var].shape[2]))
+                            # Reshape correlation maps
+                            pred_t_corr_reshape = np.reshape(time_correlation,
+                                                             (predictand.dict_predict[predictand.var].shape[1],
+                                                              predictand.dict_predict[predictand.var].shape[2]))
+                            significance_corr_reshape = np.reshape(significance, (
+                                predictand.dict_predict[predictand.var].shape[1],
+                                predictand.dict_predict[predictand.var].shape[2]))
 
-                                logger.info(f'time correlation: {np.nanmean(pred_t_corr_reshape)}')
-                                logger.info(f'pattern correlation: {np.nanmean(pattern_corr_values)}')
+                            logger.info(f'time correlation: {np.nanmean(pred_t_corr_reshape)}')
+                            logger.info(f'pattern correlation: {np.nanmean(pattern_corr_values)}')
 
-                                logger.info("Plot and save variables")
-                                ex = ExportVarPlot(output_label, cl_config)
+                            logger.info("Plot and save variables")
+                            ex = ExportVarPlot(output_label, cl_config)
 
-                                ex.save_plot_and_time_correlation(forecast_nn.list_precursors, predictand,
-                                                                  pred_t_corr_reshape,
-                                                                  significance_corr_reshape,
-                                                                  forecast_nn.list_precursors_all,
-                                                                  np.nanmean(pred_t_corr_reshape))
-                                dict_skills_pattern[ex.predictor_names] = {
-                                    'nr_neurons': nr_neurons,
-                                    'opt_method': opt_method,
-                                    'nr_epochs': nr_epochs,
-                                    'nr_layers': nr_layers,
-                                    'lr_rate': lr_rate,
-                                    'nr_batch_size': lr_rate,
-                                    'time correlation': np.nanmean(pred_t_corr_reshape),
-                                    'pattern correlation': np.nanmean(pattern_corr_values),
-                                }
-                                with open(
-                                        f'{output_path}/output-{output_label}/skill_correlation-'
-                                        f'{predictand.var}-opt.json',
-                                        'w') as fp:
-                                    json.dump(dict_skills_pattern, fp)
-                                with open(
-                                        f'{output_path}/output-{output_label}/skill_correlation-'
-                                        f'{predictand.var}-opt.json',
-                                        'w') as fp:
-                                    data = json.load(fp)
+                            ex.save_plot_and_time_correlationNN(forecast_nn.list_precursors, predictand,
+                                                              pred_t_corr_reshape,
+                                                              significance_corr_reshape,
+                                                              forecast_nn.list_precursors_all,
+                                                              np.nanmean(pred_t_corr_reshape), nr_neurons,
+                            opt_method, nr_epochs, nr_layers, lr_rate, nr_batch_size)
+                            df_parameters_opt = pd.DataFrame({"precursor": ex.predictor_names, "nr_neurons": nr_neurons,
+                                                      "opt_method": opt_method, "nr_epochs": nr_epochs,
+                                                      "nr_layers": nr_layers, "lr_rate": lr_rate,
+                                                      "nr_batch_size": nr_batch_size,
+                                                      "time_correlation": np.nanmean(pred_t_corr_reshape),
+                                                      "pattern_correlation": np.nanmean(pattern_corr_values),}, index=[index_df])
+                            filename = f'output-{output_label}/skill_correlation-{predictand.var}-opt.csv'
+                            with open(filename, 'a') as f:
+                                df_parameters_opt.to_csv(f, header=f.tell() == 0)
+                                index_df +=1
+                            # df_parameters_opt.to_json(filename)
 
-                                data.update(dict_skills_pattern)
-
-                                with open(
-                                        f'{output_path}/output-{output_label}/skill_correlation-'
-                                        f'{predictand.var}-opt.json',
-                                        'w') as fp:
-                                    json.dump(dict_skills_pattern, fp)
+                            # dict_skills_pattern[ex.predictor_names] = {
+                            #     'nr_neurons': nr_neurons,
+                            #     'opt_method': opt_method,
+                            #     'nr_epochs': nr_epochs,
+                            #     'nr_layers': nr_layers,
+                            #     'lr_rate': lr_rate,
+                            #     'nr_batch_size': lr_rate,
+                            #     'time correlation': np.nanmean(pred_t_corr_reshape),
+                            #     'pattern correlation': np.nanmean(pattern_corr_values),
+                            # }
+                            # # with open(
+                            # #         f'{output_path}/output-{output_label}/skill_correlation-'
+                            # #         f'{predictand.var}-opt.json',
+                            # #         'r') as fp:
+                            # #     json.dump(dict_skills_pattern, fp)
+                            # filename = f'output-{output_label}/skill_correlation-{predictand.var}-opt.json'
+                            # if os.path.exists(filename):
+                            #     with open(filename) as fp:
+                            #         data = json.load(fp)
+                            #     data.update(dict_skills_pattern)
+                            #     with open(f'output-{output_label}/skill_correlation-{predictand.var}-opt.json','w')\
+                            #             as fp:
+                            #         json.dump(data, fp)
+                            # else:
+                            #     with open(f'output-{output_label}/skill_correlation-{predictand.var}-opt.json','w')\
+                            #             as fp:
+                            #         json.dump(dict_skills_pattern, fp)
 
 
 if __name__ == '__main__':
