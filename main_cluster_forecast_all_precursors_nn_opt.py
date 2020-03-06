@@ -91,7 +91,8 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     for forecast_predictands in forecast_nn.list_precursors_combinations:
         # Calculate forecast_nn for all years
         forecast_nn.list_precursors = forecast_predictands
-        for opt_method in ["Nadam", "Adamax", "Adam", "SGD"]:
+
+        for opt_method in ["Adam", "SGD", "Adamax", "Nadam"]:
             for nr_batch_size in [8, 16, 32, 64]:
                 for lr_rate in [0.1, 0.01, 0.001, 0.0001]:
                     for nr_layers in range(3, 10, 1):
