@@ -295,14 +295,14 @@ class ForecastNN(Forecast):
         # Saves the entire model into a file named as  'dnn_model.h5'
         # {self.output_path}/
         file_path = f'output-{self.output_label}/' \
-                    f'{self.var} - {str(len(forecast_predictands))}-precursor/model/'
+                    f'{self.var}-{str(len(forecast_predictands))}-precursor/model/'
         Path(file_path).mkdir(parents=True, exist_ok=True)
         self.model.save(f'{file_path}/dnn_model-{self.nr_neurons}_{self.k}_cluster_{forecast_predictands}.h5')
         self.logger.info('initial loss=' + repr(out.history["loss"][1]) + ', final=' + repr(out.history["loss"][-1]))
         self.logger.info(repr(out))
 
         file_path = f'output-{self.output_label}/' \
-                    f'{self.var} - {str(len(forecast_predictands))}-precursor/progress/'
+                    f'{self.var}-{str(len(forecast_predictands))}-precursor/progress/'
         Path(file_path).mkdir(parents=True, exist_ok=True)
         # plot progress of optimization
         if 1:
@@ -402,14 +402,14 @@ class ForecastNN(Forecast):
 
         # Saves the entire model into a file named as  'dnn_model.h5'
         file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var} - {str(len(forecast_predictands))}-precursor/model/'
+                    f'{self.var}-{str(len(forecast_predictands))}-precursor/model/'
         Path(file_path).mkdir(parents=True, exist_ok=True)
         self.model.save(f'{file_path}/dnn_model-{self.nr_neurons}_{self.k}_cluster_{forecast_predictands}.h5')
         self.logger.info('initial loss=' + repr(out.history["loss"][1]) + ', final=' + repr(out.history["loss"][-1]))
         self.logger.info(repr(out))
 
         file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var} - {str(len(forecast_predictands))}-precursor/progress/'
+                    f'{self.var}-{str(len(forecast_predictands))}-precursor/progress/'
         Path(file_path).mkdir(parents=True, exist_ok=True)
         # plot progress of optimization
         if 1:
@@ -437,7 +437,8 @@ class ForecastNN(Forecast):
             axs[2].legend(['Train', 'Validation'], loc='upper right')
             plt.savefig(f"{file_path}/progress_wr_cl_loss_{self.nr_neurons}_neurons_{self.k}_cluster_"
                         f"{forecast_predictands}.pdf", bbox_inches='tight')
-
+            plt.close('all')
+            
     def prediction_nn(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, data_year_1d: dict,
                       year: int):
         """make forecast_nn
