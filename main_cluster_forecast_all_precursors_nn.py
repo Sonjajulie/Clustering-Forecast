@@ -63,7 +63,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # load forecast_nn-parameters
     method_name = 'ward'
     k = 5
-    forecast_nn = ForecastNN(inifile, cl_config, k, method_name)
+    forecast_nn = ForecastNN(inifile, output_path, output_label, cl_config, predictand.var, k, method_name)
     logger.info("Clusters: " + str(forecast_nn.k))
 
     # load precursors
@@ -76,6 +76,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
     # Calculate clusters of precursors for var, by removing one year
     predictand.calculate_clusters_from_test_data(y_train, forecast_nn.method_name, forecast_nn.k)
+    predictand.plot_composites(forecast_nn.k, 0.00001)
 
     # Calculate composites
     precursors.get_composites_data_1d_train_test(X_train, predictand.f, forecast_nn.k, forecast_nn.method_name,

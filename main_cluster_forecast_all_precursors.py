@@ -78,6 +78,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # Calculate composites
     precursors.get_composites_data_1d_train_test(X_train, predictand.f, forecast.k, forecast.method_name,
                                                  predictand.var)
+    precursors.plot_composites_without_significance(forecast.k)
     # precursors.plot_composites(k, 1)
     # subtract train mean also for test data
     # for prec in forecast_nn.list_precursors_all:

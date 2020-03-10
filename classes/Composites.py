@@ -61,6 +61,12 @@ class Composites:
         self.data_vars = {}
         self.directories_plots = {}
         self.directories_files = {}
+        self.lat_min = {}
+        self.lat_max = {}
+        self.lon_min = {}
+        self.lon_max = {}
+        self.lat_bnds = {}
+        self.lon_bnds = {}
         self.ds = None
         self.ds_arrays = None
         self.end_n = None
@@ -201,9 +207,8 @@ class Composites:
                     latitude=self.dict_precursors_var[label].latitude[::-1])
             if self.config.has_option(config_var, "coords"):
                 self.cut_area[self.var] = True
-                self.dict_precursors_var[self.var] = self.dict_precursors_var[label].sel(latitude=slice(*self.lat_bnds),
-                                                                                         longitude=slice(
-                                                                                             *self.lon_bnds))
+                self.dict_precursors_var[self.var] = self.dict_precursors_var[label].sel(latitude=slice(
+                    *self.lat_bnds[config_var]),longitude=slice(*self.lon_bnds[config_var]))
             else:
                 self.cut_area[self.var] = False
         elif all(x in self.dict_precursors_var[label].coords for x in ['lat', 'lon']):
@@ -215,8 +220,8 @@ class Composites:
                     lat=self.dict_precursors_var[label].lat[::-1])
             if self.config.has_option(config_var, "coords"):
                 self.cut_area[self.var] = True
-                self.dict_precursors_var[label] = self.dict_precursors_var[label].sel(lat=slice(*self.lat_bnds),
-                                                                                      lon=slice(*self.lon_bnds))
+                self.dict_precursors_var[label] = self.dict_precursors_var[label].sel(lat=slice(*self.lat_bnds[self.var]),
+                                                                                      lon=slice(*self.lon_bnds[self.var]))
             else:
                 self.cut_area[self.var] = False
         else:
@@ -239,10 +244,12 @@ class Composites:
         get boundaries of initialization file
         :param config_var: variable name of precursor section on config
         """
+        var_name = self.config[config_var]["name"]
         if self.config.has_option(config_var, "coords"):
-            self.lat_min, self.lat_max, self.lon_min, self.lon_max = \
+            self.lat_min[var_name], self.lat_max[var_name], self.lon_min[var_name], self.lon_max[var_name] = \
                 map(float, self.config[config_var]["coords"].split(','))
-            self.lat_bnds, self.lon_bnds = [self.lat_min, self.lat_max], [self.lon_min, self.lon_max]
+            self.lat_bnds[var_name], self.lon_bnds[var_name] = [self.lat_min[var_name], self.lat_max[var_name]]\
+                , [self.lon_min[var_name], self.lon_max[var_name]]
 
     def _get_and_apply_mask(self, label, config_var):
         """
@@ -409,7 +416,8 @@ class Composites:
                         self.var = self.config[prec]["name"]
                         self._get_dim_boundaries(self.var)
                         # ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-                        ax.set_extent([self.lon_min, self.lon_max, self.lat_min, self.lat_max])
+                        ax.set_extent([self.lon_min[config_var], self.lon_max[config_var], self.lat_min[config_var],
+                                       self.lat_max[config_var]])
 
                     self._calculate_significance(ip, k, self.var, percent_boot)
                     title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
@@ -507,7 +515,8 @@ class Composites:
                 ax.add_feature(cfeature.BORDERS, linewidth=0.1)
                 ax.coastlines()
                 if self.cut_area:
-                    ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
+                    ax.set_extent([self.lon_min[config_var], self.lon_max[config_var], self.lat_min[config_var],
+                                   (2 * self.lat_max[config_var] - 90)])
                 ax.set_aspect(self.aspect)
                 ax.set_title(f"{self.var}, {self.dict_precursors[self.var].time.values[year]}, cluster: "
                              f"{f[year]}", fontsize=10)

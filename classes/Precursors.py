@@ -68,6 +68,7 @@ class Precursors(Composites):
         """
         self._save_composites_plot_without_significance(k)
 
+
     def _save_composites_plot_without_significance(self, k: int):
         """
         save clusters into one plot using xarray library
@@ -102,13 +103,7 @@ class Precursors(Composites):
                                                             # cbar_kwargs={'shrink': 0.8, 'pad':0.02},
                                                             )
 
-            p.fig.subplots_adjust(hspace=0.15, wspace=0.15)
-            p.add_colorbar(orientation="vertical",
-                           label=f"{self.dict_precursors[self.var].attrs['long_name']}["
-                                 f"{self.dict_precursors[self.var].attrs['units']}]",
-                           shrink=0.8,
-                           aspect=30, pad=0.02)
-
+            p.fig.subplots_adjust(hspace=0.2, wspace=0.15)
             for ip, ax in enumerate(p.axes.flat):
                 if ip < k:
                     ax.add_feature(cfeature.BORDERS, linewidth=0.1)
@@ -120,7 +115,7 @@ class Precursors(Composites):
                     plt.rcParams['hatch.linewidth'] = 0.03  # hatch linewidth
                     plt.rcParams['hatch.color'] = 'k'  # hatch color --> black
                     if self.map_proj_nr[self.var] == 0 or self.map_proj_nr[self.var] == 4:
-                        gl = ax.gridlines(draw_labels=True,
+                        gl = ax.gridlines( draw_labels=True,
                                           linewidth=0.02, color='gray', linestyle='--')
                         gl.xlabels_top = False
                         gl.ylabels_right = False
@@ -130,19 +125,25 @@ class Precursors(Composites):
                         gl.yformatter = LATITUDE_FORMATTER
                         gl.xlabel_style = {'size': axislsize, 'color': 'black'}
                         gl.ylabel_style = {'size': axislsize, 'color': 'black'}
-                        gl.xlocator = mticker.FixedLocator([i for i in range(-180, 190, 30)])
+                        gl.xlocator = mticker.FixedLocator([i for i in range(-180, 360, 30)])
                         gl.ylocator = mticker.FixedLocator([i for i in range(-100, 100, 20)])
-
-                    if self.cut_area[self.var]:
-                        self.var = self.config[prec]["name"]
-                        self._get_dim_boundaries(self.var)
+                    if self.cut_area[self.var] and self.var != "ICEFRAC":
+                        # self.var = self.config[prec]["name"]
+                        # self._get_dim_boundaries(prec)
                         # ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-                        ax.set_extent([self.lon_min, self.lon_max, self.lat_min, self.lat_max])
+                        ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var], self.lat_max[self.var]])
+
                     # Without this aspect attributes the maps will look chaotic and the
                     # "extent" attribute above will be ignored
                     # ax.set_aspect("equal")
-            plt.subplots_adjust(left=0.03, right=0.82, top=0.90, bottom=0.05)
-            plt.savefig(f"{self.directories_plots[self.var]}/composites.png")
+
+            p.add_colorbar(orientation="vertical",
+                           label=f"{self.dict_precursors[self.var].attrs['long_name']}["
+                                 f"{self.dict_precursors[self.var].attrs['units']}]",
+                           shrink=0.8,
+                           aspect=30, pad=0.1)
+            # plt.subplots_adjust(left=0.03, right=0.82, top=0.90, bottom=0.05)
+            plt.savefig(f"{self.directories_plots[self.var]}/composites-{self.var}.pdf")
             plt.close()
 
     def _set_directory_plots(self, directory: str):
