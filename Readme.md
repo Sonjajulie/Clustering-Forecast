@@ -4,23 +4,6 @@ Clustering Forecast
 
 Python version: python 3.7
 
-
-### Library Requirements:
- - numpy
- - netCDF4
- - scipy
- - matplotlib
- - xarrar
- - configparser
- - seaborn
- - pandas
- - logging
- - cartopy
- - os
- - cftime
- - pathlib
- - pickle
- 
  
 ###  Create masks:
 For the clustering forecast algorithm masks must be written in asci-code.
@@ -219,14 +202,23 @@ For the forecast algothim start program with:
 
 For calculating the clusters use:
 ```bash
-./main_cluster_timeplot.py FORECAST-VARIABLE
+python3 main_cluster.py --predictand $VARIABLE --logfile logs/log_${VARIABLE}.log  --outputlabel $output_label  -ini ini/$INIFILE.ini
 ```
 
 For calculating the composites (first clusters should be calculated) use:
 ```bash
-./start_composite_program.sh
+python3 main_composites.py -ini ini/$INIFILE.ini --outputlabel $outputlabel --predictand $PREDICTAND --logfile logs/log_${PREDICTAND}.log --numbers $HOW_MANY_DATAPOINTS --percentage $SIGNIFICANTLEVEL
 ```
 
+For calculating the forecast of a predictand use:
+```bash
+python3 main_cluster_forecast_all_precursors.py -ini ini/$INIFILE.ini --outputlabel $outputlabel --predictand $PREDICTAND --logfile logs/log_${PREDICTAND}.log --datarange $DATA_MIN_POINT $DATA_MAX_POINT
+```
+
+For calculating the forecast using clustering and neural networks of a predictand use:
+```bash
+python3 main_cluster_forecast_all_precursors_nn.py -ini ini/$INIFILE.ini --outputlabel $outputlabel --predictand $PREDICTAND --logfile logs/log_${PREDICTAND}.log --datarange $DATA_MIN_POINT $DATA_MAX_POINT
+```
 ##### References
 Totz, S., Tziperman, E., Coumou, D., Pfeiffer, K., & Cohen, J. 
 Winter precipitation forecast in the European and Mediterranean regions using cluster analysis. 

@@ -108,10 +108,11 @@ class Predictand(Clusters):
         # calculate frequency
         # self._states_of_each_cluster()
         # set directories for plots and files
-        self._set_directory_plots(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
+        # {self.output_path}/
+        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
+        self._set_directory_files(f"output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
 
@@ -188,9 +189,9 @@ class Predictand(Clusters):
         self._set_clusters_1d()
         self._set_clusters_reshape()
         # set directories for plots and files
-        self._set_directory_plots(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
+        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
+        self._set_directory_files(f"output-{self.output_label}/{self.var}/Cluster/{self.method_name}_Cluster_{self.k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
         # calculate frequency
         # self._states_of_each_cluster()

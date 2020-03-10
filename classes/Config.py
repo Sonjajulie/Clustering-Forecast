@@ -37,18 +37,18 @@ class Config:
                 },
                 '__main__': {  # if __name__ == '__main__'
                     'handlers': ['console','file'],
-                    'level': 'ERROR', # at what level shall call begin (still different for the handler)
+                    'level': 'INFO', # at what level shall call begin (still different for the handler)
                     'propagate': False
                 },
                 'classes.Clusters': {  # if __name__ == 'classes.Clusters'
                     'handlers': ['console','file'],
-                    'level': 'ERROR', # at what level shall call begin (still different for the handler)
+                    'level': 'INFO', # at what level shall call begin (still different for the handler)
                     'propagate': False
                 },
 
                 'classes.Composites': {  # if __name__ == 'classes.Composites'
                     'handlers': ['console','file'],
-                    'level': 'ERROR', # at what level shall call begin (still different for the handler)
+                    'level': 'INFO', # at what level shall call begin (still different for the handler)
                     'propagate': False
                 },
 

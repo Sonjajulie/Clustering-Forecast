@@ -17,5 +17,5 @@ module load python/3.6.8
 ncar_pylib -c 20190723 /glade/work/totz/my_npl_clone_casper
 ncar_pylib my_npl_clone_casper
 
-python3 main_cluster.py --predictand $var --logfile logs/log_${var}.log  --outputlabel $output_label  -ini ini/clusters_America_$var.ini
+python3 ../main_cluster.py --predictand $var --logfile logs/log_${var}.log  --outputlabel $output_label  -ini ini/clusters_America_$var.ini
 
