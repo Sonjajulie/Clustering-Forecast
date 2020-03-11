@@ -14,6 +14,7 @@ from classes.ClusteringParser import ClusteringParser
 from classes.Config import Config
 from scipy.optimize import shgo
 import json
+import math
 
 def lat_range(x):
     if (x[1] < 0 and x[0] > 0):
@@ -22,9 +23,9 @@ def lat_range(x):
 
 
 def lon_range(x):
-    if (x[1] < 0 and x[0] > 0):
+    if (x[3] < 0 and x[2] > 0):
         return -1
-    return x[1] - x[0] - 10  # >=0
+    return x[3] - x[2] - 10  # >=0
 
 
 
@@ -148,11 +149,14 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
             np.array(y_test[f"{predictand.var}"]), forecast_data)
         # display information
         # display information
+        time_correlation_mean = np.nanmean(time_correlation)
         if info['Nfeval'] % 2 == 0:
-            logger.info(f"{x[0]:4f} {x[1]:4f} {x[2]:4f} {x[3]:4f} {time_correlation}")
+            logger.info(f"{x[0]:4f} {x[1]:4f} {x[2]:4f} {x[3]:4f} {time_correlation_mean}")
         info['Nfeval'] += 1
-
-        return  -time_correlation
+        if math.isnan(time_correlation_mean):
+            return 1.
+        else:
+            return -time_correlation_mean
 
     cons = ({'type': 'ineq', 'fun': lat_range},
             {'type': 'ineq', 'fun': lon_range},)
