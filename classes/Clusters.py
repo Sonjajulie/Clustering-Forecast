@@ -106,7 +106,7 @@ class Clusters:
                 self.list_of_files = [os.path.join(self.path, item) for item in os.listdir(self.path)
                                       if os.path.isfile(os.path.join(self.path, item))]
                 # ,decode_times=False,combine='by_coords'   .load()
-                self.list_of_files = (self.list_of_files)
+                self.list_of_files = sorted(self.list_of_files)
                 length_files = len(self.list_of_files)
                 for i in range(length_files):
                     self.logger.debug(f"file {i}: {self.list_of_files[i]}")

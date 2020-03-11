@@ -68,7 +68,6 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
     # load precursors
     precursors = Precursors(inifile, output_path, output_label, cl_config)
-
     # Create train and test dataset with an 66:33 split
     # noinspection PyPep8Naming
     y_train, X_train, y_test, X_test = train_test_split_pred(predictand, precursors, data_range)
@@ -78,7 +77,6 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # Calculate composites
     precursors.get_composites_data_1d_train_test(X_train, predictand.f, forecast.k, forecast.method_name,
                                                  predictand.var)
-    precursors.plot_composites_without_significance(forecast.k)
     # precursors.plot_composites(k, 1)
     # subtract train mean also for test data
     # for prec in forecast_nn.list_precursors_all:

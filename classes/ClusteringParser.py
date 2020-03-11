@@ -30,5 +30,7 @@ class ClusteringParser:
                                  help='What data points should be used for testing and training data, used in function '
                                       'train_test_split_pred')
 
+        self.parser.add_argument('-f_prec', '--forecast_precursors', type=str, nargs='+', required=False, default=["Z500"],
+                                 help='list of precursors for forecasting, only accessable for optimization mode')
         self.args = self.parser.parse_args()
         self.arguments = vars(self.args)

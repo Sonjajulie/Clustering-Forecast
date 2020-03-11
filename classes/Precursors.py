@@ -181,13 +181,14 @@ class Precursors(Composites):
         :param k: number of clusters
         :param method_name: method for clustering
         :param predictand: variable name of predictand
+
         """
         # do I really need this?
         # self.dict_prec_1D_var = train_data
         self._set_cluster_frequency(f)
         self.dict_standardized_precursors = train_data
         # go through all forecast_nn variables
-        for prec in self.dict_precursors.keys():
+        for prec in self.dict_standardized_precursors.keys():
             self.var = prec
 
 

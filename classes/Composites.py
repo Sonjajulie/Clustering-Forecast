@@ -61,6 +61,7 @@ class Composites:
         self.data_vars = {}
         self.directories_plots = {}
         self.directories_files = {}
+        self.dict_precursors_cut = {}
         self.lat_min = {}
         self.lat_max = {}
         self.lon_min = {}
@@ -143,6 +144,7 @@ class Composites:
                 self.fig_size[self.var] = int(self.config[prec]["figsize"])
                 self.aspect[self.var] = int(self.config[prec]["aspect"])
                 self.cross_size = float(self.config[prec]["hashsize"])
+
                 # change dimenson of precursor  to changed to dim = [time*models,lons,lats]!
                 # list_time_model = [f"{i + 1}: {j}" for i in range(len(self.list_of_files))
                 #                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
@@ -218,6 +220,7 @@ class Composites:
             if self.ll[1] - self.ll[0] < 0:
                 self.dict_precursors_var[label] = self.dict_precursors_var[label].reindex(
                     lat=self.dict_precursors_var[label].lat[::-1])
+
             if self.config.has_option(config_var, "coords"):
                 self.cut_area[self.var] = True
                 self.dict_precursors_var[label] = self.dict_precursors_var[label].sel(lat=slice(*self.lat_bnds[self.var]),
@@ -226,6 +229,42 @@ class Composites:
                 self.cut_area[self.var] = False
         else:
             raise ValueError("Spatial attribute (e.g. latitude and longitude) not found!")
+
+    def set_area_composite_opt(self, var: str, cut_array: list):
+        """
+         Get Longitudes and Latitudes for optimization
+        :param var: variable name of precursor
+        :param cut_array:  new longitudinal and latitudinal range
+        """
+        # check name for latitude and longitude and cut area accordingly
+        #  https://stackoverflow.com/questions/29135885/netcdf4-extract-for-subset-of-lat-lon
+        self.var = var
+        if self.label_lat == "latitude":
+            self.cut_area[self.var] = True
+            self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var], self.lat_max[self.var] = cut_array
+            self.dict_precursors[self.var] = self.dict_precursors[self.var].sel(latitude=slice(
+                cut_array[0], cut_array[1]),longitude=slice(cut_array[2], cut_array[3]))
+
+
+        elif self.label_lat == "lat":
+            self.cut_area[self.var] = True
+            self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var], self.lat_max[self.var] = cut_array
+            self.dict_precursors_cut[self.var] = self.dict_precursors[self.var].sel(lat=slice(
+                cut_array[0], cut_array[1]),lon=slice(cut_array[2], cut_array[3]))
+        else:
+            raise ValueError("Spatial attribute (e.g. latitude and longitude) not found!")
+
+        self.dict_prec_1D[self.var] = np.reshape(np.array(self.dict_precursors_cut[self.var]),
+                                                 [np.array(self.dict_precursors_cut[self.var])
+                                                 .shape[0], -1])
+        self.dict_prec_1D[self.var][self.dict_prec_1D[self.var] != self.dict_prec_1D[self.var]] = 0
+        self.varmean = np.mean(self.dict_prec_1D[self.var], axis=0)
+        self.varAnom = self.dict_prec_1D[self.var] - self.varmean
+        if self.output_label == "standardized" or self.output_label == "standardized-opt":
+            self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+            self.dict_standardized_precursors[self.var] = self.varAnom / self.sigma_var
+        else:
+            self.dict_standardized_precursors[self.var] = self.varAnom
 
     def _transform_to_1d_and_remove_nans(self, label: str):
         """
@@ -250,6 +289,7 @@ class Composites:
                 map(float, self.config[config_var]["coords"].split(','))
             self.lat_bnds[var_name], self.lon_bnds[var_name] = [self.lat_min[var_name], self.lat_max[var_name]]\
                 , [self.lon_min[var_name], self.lon_max[var_name]]
+
 
     def _get_and_apply_mask(self, label, config_var):
         """
@@ -416,8 +456,8 @@ class Composites:
                         self.var = self.config[prec]["name"]
                         self._get_dim_boundaries(self.var)
                         # ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
-                        ax.set_extent([self.lon_min[config_var], self.lon_max[config_var], self.lat_min[config_var],
-                                       self.lat_max[config_var]])
+                        ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
+                                       self.lat_max[self.var]])
 
                     self._calculate_significance(ip, k, self.var, percent_boot)
                     title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
@@ -515,8 +555,8 @@ class Composites:
                 ax.add_feature(cfeature.BORDERS, linewidth=0.1)
                 ax.coastlines()
                 if self.cut_area:
-                    ax.set_extent([self.lon_min[config_var], self.lon_max[config_var], self.lat_min[config_var],
-                                   (2 * self.lat_max[config_var] - 90)])
+                    ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
+                                   (2 * self.lat_max[self.var] - 90)])
                 ax.set_aspect(self.aspect)
                 ax.set_title(f"{self.var}, {self.dict_precursors[self.var].time.values[year]}, cluster: "
                              f"{f[year]}", fontsize=10)
