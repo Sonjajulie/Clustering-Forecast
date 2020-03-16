@@ -76,6 +76,7 @@ class Clusters:
         logging.config.dictConfig(cl_config)
         self.logger = logging.getLogger(__name__)
         self.logger.info('Read ini-file')
+        self.logger.info(inifile_in)
         self.inifile = inifile_in
         # https://docs.python.org/3/library/configparser.html
         self.config = configparser.ConfigParser()
@@ -333,10 +334,10 @@ class Clusters:
         # calculate frequency
         # self._states_of_each_cluster()
         # set directories for plots and files
-        self._set_directory_plots(f"output-{self.output_label}/{self.var}/Cluster/"
+        self._set_directory_plots(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/plots/")
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
-        self._set_directory_files(f"output-{self.output_label}/{self.var}/Cluster/"
+        self._set_directory_files(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/files/")
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
 

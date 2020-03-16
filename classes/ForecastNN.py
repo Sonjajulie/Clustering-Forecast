@@ -254,15 +254,23 @@ class ForecastNN(Forecast):
         self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo = \
             self.train_test_split_nn(self.k, self.alpha_all_years, y_train)
         self.logger.info('Create network (model): specify number of neurons in each layer:')
-        self.nr_neurons = self.k
+        self.nr_neurons = 16  # self.k
         np.random.seed(3456)
         print(self.k)
         self.model = Sequential()  # kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None),
         # bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None)
+
+        lr_rate = 0.1  # default: 0.0001
+
+        # input should be the alphas, right? and output should be the betas!!!!
+
         self.model.add(Dense(self.nr_neurons, input_dim=len(self.alphas_train[0]), activation='relu', ))
-        self.model.add(Dense(self.nr_neurons, activation='relu', kernel_regularizer=regularizers.l2(0.0001)))
+        self.model.add(Dense(self.nr_neurons, activation='relu', kernel_regularizer=regularizers.l2(lr_rate)))
+        self.model.add(Dense(self.nr_neurons, activation='relu', kernel_regularizer=regularizers.l2(lr_rate)))
+        self.model.add(Dense(self.nr_neurons, activation='relu', kernel_regularizer=regularizers.l2(lr_rate)))
+        self.model.add(Dense(self.nr_neurons, activation='relu', kernel_regularizer=regularizers.l2(lr_rate)))
         # self.model.add(Dense(self.k, activation='relu', kernel_regularizer=regularizers.l2(0.0001)))
-        self.model.add(Dense(self.nr_neurons, activation='linear'))
+        self.model.add(Dense(self.k, activation='linear'))
 
         wr_cl_loss = wrapper_function_cluster_loss(np.asarray(self.clusters_1d), np.asarray(y_train), self.k,
                                                    self.batch_size)
@@ -288,21 +296,20 @@ class ForecastNN(Forecast):
         # ,callbacks = [checkpoint]
 
         out = self.model.fit(self.alphas_train, self.y_train_pseudo,
-                             validation_data=(self.alphas_val, self.y_val_pseudo), epochs=500,
+                             validation_data=(self.alphas_val, self.y_val_pseudo), epochs=100,
                              batch_size=self.batch_size, verbose=0)  #
         # , epochs=500, batch_size=30, verbose=0, callbacks=[mcp]verbose=0)
 
         # Saves the entire model into a file named as  'dnn_model.h5'
-        # {self.output_path}/
-        file_path = f'output-{self.output_label}/' \
-                    f'{self.var}-{str(len(forecast_predictands))}-precursor/model/'
+        file_path = f'{self.output_path}/output-{self.output_label}/' \
+                    f'{self.var} - {str(len(forecast_predictands))}-precursor/model/'
         Path(file_path).mkdir(parents=True, exist_ok=True)
         self.model.save(f'{file_path}/dnn_model-{self.nr_neurons}_{self.k}_cluster_{forecast_predictands}.h5')
         self.logger.info('initial loss=' + repr(out.history["loss"][1]) + ', final=' + repr(out.history["loss"][-1]))
         self.logger.info(repr(out))
 
-        file_path = f'output-{self.output_label}/' \
-                    f'{self.var}-{str(len(forecast_predictands))}-precursor/progress/'
+        file_path = f'{self.output_path}/output-{self.output_label}/' \
+                    f'{self.var} - {str(len(forecast_predictands))}-precursor/progress/'
         Path(file_path).mkdir(parents=True, exist_ok=True)
         # plot progress of optimization
         if 1:
@@ -330,8 +337,120 @@ class ForecastNN(Forecast):
             axs[2].legend(['Train', 'Validation'], loc='upper right')
             plt.savefig(f"{file_path}/progress_wr_cl_loss_{self.nr_neurons}_neurons_{self.k}_cluster_"
                         f"{forecast_predictands}.pdf", bbox_inches='tight')
-            plt.close('all')
 
+
+    # noinspection PyPep8Naming
+    def train_nn_opt(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, X_train: dict,
+                 y_train: np.array, nr_neurons: int, opt_method: str, nr_epochs: int, nr_layers: int, lr_rate: np.float,
+                     nr_batch_size: int):
+        """
+        optimize forecast by using different parameters to train nn for forecast
+        :param forecast_predictands: list contains predictands which should be used to forecast
+        :param clusters_1d: dict of all k-clusters
+        :param composites_1d: dict of composites with time and one-dimensional array
+        :param X_train: np.ndarray with all  data of precursors
+        :param y_train: np.ndarray with all  data of predictands
+        :param nr_neurons: number of neurons in each layer
+        :param opt_method: optimization method
+        :param nr_epochs: number of epochs
+        :param nr_layers: number of layers
+        :param lr_rate: learning rate
+        """
+        # Merge only those precursors which were selected
+        self.selected_composites_1D = np.hstack([composites_1d[i] for i in forecast_predictands])
+        self.selected_data_1d = np.hstack([X_train[i] for i in forecast_predictands])
+        self.clusters_1d = clusters_1d
+
+        # Calculate projection coefficients for all points in training set
+        self.len_selected_data = len(self.selected_data_1d)
+        self.alpha_all_years = np.zeros((self.len_selected_data, self.k))
+        self.alpha_matrix = np.zeros((self.k, self.k))
+        for year in range(self.len_selected_data):
+            self.alpha_all_years[year] = self._projection_coefficients_year(year)
+
+        self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo = \
+            self.train_test_split_nn(self.k, self.alpha_all_years, y_train)
+        self.logger.info('Create network (model): specify number of neurons in each layer:')
+        self.nr_neurons = nr_neurons # self.k
+        np.random.seed(3456)
+        print(self.k)
+        self.model = Sequential()  # kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None),
+        # bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None)
+        self.model.add(Dense(self.nr_neurons, input_dim=len(self.alphas_train[0]), activation='relu', ))
+        for _ in range(nr_layers):
+            self.model.add(Dense(self.nr_neurons, activation='relu', kernel_regularizer=regularizers.l2(lr_rate)))
+        self.model.add(Dense(self.k, activation='linear'))
+
+        wr_cl_loss = wrapper_function_cluster_loss(np.asarray(self.clusters_1d), np.asarray(y_train), self.k,
+                                                   nr_batch_size)
+        self.dict_optimizer = {"Adam": optimizers.Adam(), "SGD": optimizers.SGD(), "Adamax": optimizers.Adamax(),
+                               "Nadam": optimizers.Nadam(),}
+        self.model.compile(
+            loss=wr_cl_loss, optimizer=self.dict_optimizer[opt_method],metrics=['mean_squared_error'])
+
+
+        # Check the sizes of all newly created datasets
+        logging.debug("Shape of x_train:", self.alphas_train.shape)
+        logging.debug("Shape of x_val:", self.alphas_val.shape)
+        logging.debug("Shape of y_train_pseudo:", self.y_train_pseudo.shape)
+        logging.debug("Shape of y_val_pseudo:", self.y_val_pseudo.shape)
+
+        logging.info('Train (fit) the network...')
+        # filepath = f"ModelWeights-{self.nr_neurons}.hdf5"
+        # checkpoint = ModelCheckpoint(filepath, save_best_only=True,
+        #                              monitor="val_mean_squared_error")
+
+        # ,callbacks = [checkpoint]
+
+        out = self.model.fit(self.alphas_train, self.y_train_pseudo,
+                             validation_data=(self.alphas_val, self.y_val_pseudo), epochs=nr_epochs,
+                             batch_size=self.batch_size, verbose=0)  #
+        # , epochs=500, batch_size=30, verbose=0, callbacks=[mcp]verbose=0)
+
+        # Saves the entire model into a file named as  'dnn_model.h5'
+        # {self.output_path}/
+        file_path = f'{self.output_path}/output-{self.output_label}/' \
+                    f'{self.var}-{str(len(forecast_predictands))}-precursor/model/'
+        Path(file_path).mkdir(parents=True, exist_ok=True)
+        self.model.save(f'{file_path}/dnn_model-{self.nr_neurons}_{self.k}_cluster_{forecast_predictands}.h5')
+        self.logger.info('initial loss=' + repr(out.history["loss"][1]) + ', final=' + repr(out.history["loss"][-1]))
+        self.logger.info(repr(out))
+
+        file_path = f'{self.output_path}/output-{self.output_label}/' \
+                    f'{self.var} - {str(len(forecast_predictands))}-precursor/progress/'
+        Path(file_path).mkdir(parents=True, exist_ok=True)
+
+        file_path = f'output-{self.output_label}/' \
+                    f'{self.var}-{str(len(forecast_predictands))}-precursor/progress/'
+        Path(file_path).mkdir(parents=True, exist_ok=True)
+        # plot progress of optimization
+        if 1:
+
+            fig, axs = plt.subplots(3, figsize=(12, 18))
+            # plt.figure(1, figsize=(12, 6));
+            # fig.suptitle("Model's Training & Validation process across epochs")
+            # axs[0].set_title("Model's Training & Validation across epochs")
+            axs[0].legend(['log(loss)'])
+            axs[0].semilogy(out.history["loss"][:])
+            axs[0].semilogy(out.history["val_loss"][:])
+            axs[0].legend(['Train', 'Validation'], loc='upper right')
+            axs[0].set(ylabel='$\log_{10}$(loss)')
+
+
+            axs[1].plot(self.model.history.history['loss'])
+            axs[1].plot(self.model.history.history['val_loss'])
+            # axs[1].set_title("Model's Training & Validation mean squared error across epochs")
+            axs[1].set(ylabel='Loss')
+            axs[1].legend(['Train', 'Validation'], loc='upper right')
+
+            axs[2].plot(self.model.history.history['mean_squared_error'])
+            axs[2].plot(self.model.history.history['val_mean_squared_error'])
+            # axs[2].set_title("Model's Training & Validation mean squared error across epochs")
+            axs[2].set(xlabel='Epochs', ylabel='mean squared diff between alphas & betas' )
+            axs[2].legend(['Train', 'Validation'], loc='upper right')
+            plt.savefig(f"{file_path}/progress_wr_cl_loss_{self.nr_neurons}_neurons_{self.k}_cluster_"
+                        f"{forecast_predictands}.pdf", bbox_inches='tight')
+            plt.close('all')
 
     # noinspection PyPep8Naming
     def train_nn_opt(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, X_train: dict,
