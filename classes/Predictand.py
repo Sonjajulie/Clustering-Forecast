@@ -66,10 +66,11 @@ class Predictand(Clusters):
         :param output_label: label for substring of output directory
         :param cl_config: dictionary, where all information of logger is stored from classes/config
         """
+        self.logger = logging.getLogger(__name__)
         super().__init__(inifile_in, output_path, output_label, cl_config)
         logging.config.dictConfig(cl_config)
-        self.logger = logging.getLogger(__name__)
-        self.logger.info('Read ini-file')
+
+
         self.sigma_var = None
         self.varmean = None
         self.varAnom = None

@@ -114,7 +114,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
                                                             predictand.dict_predict[predictand.var].shape[2]))
         significance_corr_reshape = np.reshape(significance, (predictand.dict_predict[predictand.var].shape[1],
                                                               predictand.dict_predict[predictand.var].shape[2]))
-
+        precursors.plot_composites_without_significance(k)
         logger.info(f'time correlation: {np.nanmean(pred_t_corr_reshape)}')
         logger.info(f'pattern correlation: {np.nanmean(pattern_corr_values)}')
 

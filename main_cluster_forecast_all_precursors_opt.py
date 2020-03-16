@@ -12,7 +12,7 @@ from classes.Forecast import Forecast
 from classes.ExportVarPlot import ExportVarPlot
 from classes.ClusteringParser import ClusteringParser
 from classes.Config import Config
-from scipy.optimize import shgo
+from scipy.optimize import shgo, dual_annealing
 import json
 import math
 
@@ -99,24 +99,32 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     output_label = cl_parser.arguments['outputlabel']
     output_path = cl_parser.arguments['outputpath']
     data_range = cl_parser.arguments['datarange']
+    logger.info(inifile)
+    logger.info(output_path)
+    logger.info(output_label)
+    logger.info(data_range)
     predictand = Predictand(inifile, output_path, output_label, cl_config)
     dict_skills_pattern = {}
 
     # load forecast_nn-parameters
     method_name = 'ward'
-    k = 5
+    k = 6
     forecast = Forecast(inifile, cl_config, k, method_name)
     logger.info("Clusters: " + str(forecast.k))
 
     # load precursors
     precursors = Precursors(inifile, output_path, output_label, cl_config)
     forecast_precursors = cl_parser.arguments['forecast_precursors']
+    logger.info(forecast_precursors)
 
     y_train, X_train, y_test, X_test = train_test_split_pred(predictand, precursors, data_range, forecast_precursors)
     # Calculate clusters of precursors for var, by removing one year
     predictand.calculate_clusters_from_test_data(y_train, forecast.method_name, forecast.k)
 
     def skill(x, info):
+        if lat_range(x) < 0 or lon_range(x) < 0:
+            return 1
+            
         cut_area_opt = x
         precursors.set_area_composite_opt(forecast_precursors[0], cut_area_opt)
         # Create train and test dataset with an 66:33 split
@@ -139,6 +147,8 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
         for year in range(len(y_test[predictand.var])):  # len(y_test[predictand.var])):
             # print(year)
+            if math.isnan(np.nanmean(precursors.dict_composites[forecast_precursors[0]][0])):
+                return 1
             forecast_temp = forecast.prediction(predictand.clusters, precursors.dict_composites, X_test, year)
             # Assign forecast_nn data to array
             forecast_data[year] = forecast_temp
@@ -149,9 +159,11 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
             np.array(y_test[f"{predictand.var}"]), forecast_data)
         # display information
         # display information
+
         time_correlation_mean = np.nanmean(time_correlation)
-        if info['Nfeval'] % 2 == 0:
-            logger.info(f"{x[0]:4f} {x[1]:4f} {x[2]:4f} {x[3]:4f} {time_correlation_mean}")
+        if info['best_values'] >= time_correlation_mean:
+            info['best_values'] = time_correlation_mean
+            logger.info(f"{x[0]:4f} {x[1]:4f} {x[2]:4f} {x[3]:4f} {time_correlation_mean} {info['Nfeval']}")
         info['Nfeval'] += 1
         if math.isnan(time_correlation_mean):
             return 1.
@@ -165,7 +177,8 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
               (precursors.lat_min[var] + 10, precursors.lat_max[var]),
               (precursors.lon_min[var], precursors.lon_max[var] - 10),
               (precursors.lon_min[var] + 10,precursors.lon_max[var])]
-    res = shgo(skill, bounds, args=({'Nfeval':0},), iters=3, constraints=cons)
+    # ~ res = shgo(skill, bounds, args=({'Nfeval':0},), iters=10, constraints=cons)
+    res = dual_annealing(skill, bounds, args=({'Nfeval':0, 'best_values' : 1},), maxiter=5000)
     print(res)
 
 

@@ -37,7 +37,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     all_precs_names = [x for x in precursors.dict_precursors.keys()]
 
     # Calculate forecast_nn for all years
-    for year in range(int(forecast.beg_year), int(forecast.beg_year) + 3):  # int(forecast_nn.end_year)
+    for year in range(int(forecast.beg_year), int(forecast.end_year)):  # int(forecast_nn.end_year)
 
         # Calculate clusters of precursors for var, by removing one year
         predictand.calculate_clusters_year(forecast.method_name, forecast.k, year - forecast.beg_year)

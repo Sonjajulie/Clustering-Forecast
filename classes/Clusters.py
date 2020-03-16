@@ -76,6 +76,7 @@ class Clusters:
         logging.config.dictConfig(cl_config)
         self.logger = logging.getLogger(__name__)
         self.logger.info('Read ini-file')
+        self.logger.info(inifile_in)
         self.inifile = inifile_in
         # https://docs.python.org/3/library/configparser.html
         self.config = configparser.ConfigParser()
