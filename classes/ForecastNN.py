@@ -330,6 +330,7 @@ class ForecastNN(Forecast):
             axs[2].legend(['Train', 'Validation'], loc='upper right')
             plt.savefig(f"{file_path}/progress_wr_cl_loss_{self.nr_neurons}_neurons_{self.k}_cluster_"
                         f"{forecast_predictands}.pdf", bbox_inches='tight')
+            plt.close('all')
 
 
     # noinspection PyPep8Naming

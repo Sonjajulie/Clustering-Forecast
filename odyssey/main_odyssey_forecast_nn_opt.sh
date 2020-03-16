@@ -2,9 +2,9 @@
 #SBATCH -J clusters_$pred
 #SBATCH -p shared # Partition
 #SBATCH -n 1
-#SBATCH -t 1-00:00          # Runtime in D-HH:MM, minimum of 10 minutes
-#SBATCH --mem=6G  # Memory request (8Gb)
-#SBATCH --ntasks-per-node=6
+#SBATCH -t 3-00:00  # Runtime in D-HH:MM, minimum of 10 minutes
+#SBATCH --mem=16G  # Memory request (16Gb)
+#SBATCH --ntasks-per-node=16
 #SBATCH -o output_$pred.out
 #SBATCH -e error_$pred.err
 
