@@ -93,11 +93,11 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # ~ forecast_nn.list_precursors = forecast_predictands
     forecast_nn.list_precursors = ["Z500"]
     forecast_predictands = forecast_nn.list_precursors
-    for opt_method in ["Adam"]:
+    for opt_method in ["SGD"]:
         for nr_batch_size in [8, 16, 32]:
             for lr_rate in [0.01, 0.001, 0.0001]:
-                for nr_layers in range(2, 8, 1):
-                    for nr_neurons in [5, 16, 32, 64]:
+                for nr_layers in range(5, 8, 1):
+                    for nr_neurons in [16, 32, 64]:
                         # train small NN
                         forecast_nn.train_nn_opt(forecast_nn.list_precursors, predictand.clusters,
                                                  precursors.dict_composites, X_train,
@@ -116,6 +116,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
                         for year in range(len(y_test[predictand.var])):  # len(y_test[predictand.var])):
                             print(year)
                             forecast_temp = forecast_nn.prediction_nn(forecast_nn.list_precursors_all,
+                                                                      predictand.clusters,
                                                                       precursors.dict_composites, X_test, year)
                             # Assign forecast_nn data to array
                             forecast_data[year] = forecast_temp
@@ -158,7 +159,35 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
                         with open(filename, 'a') as f:
                             df_parameters_opt.to_csv(f, header=f.tell() == 0)
                             index_df +=1
- 
+                        # df_parameters_opt.to_json(filename)
+
+                        # dict_skills_pattern[ex.predictor_names] = {
+                        #     'nr_neurons': nr_neurons,
+                        #     'opt_method': opt_method,
+                        #     'nr_epochs': nr_epochs,
+                        #     'nr_layers': nr_layers,
+                        #     'lr_rate': lr_rate,
+                        #     'nr_batch_size': lr_rate,
+                        #     'time correlation': np.nanmean(pred_t_corr_reshape),
+                        #     'pattern correlation': np.nanmean(pattern_corr_values),
+                        # }
+                        # # with open(
+                        # #         f'{output_path}/output-{output_label}/skill_correlation-'
+                        # #         f'{predictand.var}-opt.json',
+                        # #         'r') as fp:
+                        # #     json.dump(dict_skills_pattern, fp)
+                        # filename = f'output-{output_label}/skill_correlation-{predictand.var}-opt.json'
+                        # if os.path.exists(filename):
+                        #     with open(filename) as fp:
+                        #         data = json.load(fp)
+                        #     data.update(dict_skills_pattern)
+                        #     with open(f'output-{output_label}/skill_correlation-{predictand.var}-opt.json','w')\
+                        #             as fp:
+                        #         json.dump(data, fp)
+                        # else:
+                        #     with open(f'output-{output_label}/skill_correlation-{predictand.var}-opt.json','w')\
+                        #             as fp:
+                        #         json.dump(dict_skills_pattern, fp)
 
 
 if __name__ == '__main__':
