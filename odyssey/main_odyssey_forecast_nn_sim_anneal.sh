@@ -18,5 +18,5 @@ echo $pred
 module load python
 source activate clustering-forecast
 
-python3 ../main_cluster_forecast_all_precursors_nn_opt.py -ini ../ini/clusters_America_${pred}_Forecast_opt.ini --outputlabel $outputlabel --predictand $pred --logfile logs/log_${pred}.log --datarange $datamin $datamax
+python3 ../main_cluster_forecast_nn_opt_sim_anneal.py -ini ../ini/clusters_America_${pred}_Forecast_opt.ini --outputlabel $outputlabel --predictand $pred --logfile logs/log_sim_${pred}.log --datarange $datamin $datamax
 

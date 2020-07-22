@@ -68,6 +68,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
     # load precursors
     precursors = Precursors(inifile, output_path, output_label, cl_config)
+
     # Create train and test dataset with an 66:33 split
     # noinspection PyPep8Naming
     y_train, X_train, y_test, X_test = train_test_split_pred(predictand, precursors, data_range)
@@ -82,7 +83,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # for prec in forecast_nn.list_precursors_all:
     #     X_test[prec] -= precursors.varmean
     # y_test[predictand.var] -= predictand.varmean
-
+    index_df = 0
     for forecast_predictands in forecast.list_precursors_combinations:
         # Calculate forecast_nn for all years
         forecast.list_precursors = forecast_predictands
@@ -114,7 +115,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
                                                             predictand.dict_predict[predictand.var].shape[2]))
         significance_corr_reshape = np.reshape(significance, (predictand.dict_predict[predictand.var].shape[1],
                                                               predictand.dict_predict[predictand.var].shape[2]))
-        precursors.plot_composites_without_significance(k)
+
         logger.info(f'time correlation: {np.nanmean(pred_t_corr_reshape)}')
         logger.info(f'pattern correlation: {np.nanmean(pattern_corr_values)}')
 
@@ -126,6 +127,17 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
                                               significance_corr_reshape, forecast.list_precursors_all, np.nanmean(pred_t_corr_reshape))
             dict_skills_pattern[ex.predictor_names] = {'time correlation':  np.nanmean(pred_t_corr_reshape),
                                                        'pattern correlation': np.nanmean(pattern_corr_values)}
+            df_parameters_opt = pd.DataFrame({"precursor": ex.predictor_names, 
+                                  "time_correlation": np.nanmean(pred_t_corr_reshape),
+                                  "pattern_correlation": np.nanmean(pattern_corr_values),}, index=[index_df])
+                                  
+                                  
+            filename = f'output-{output_label}/skill_correlation-{predictand.var}-{index_df}-opt.csv'
+            with open(filename, 'a') as f:
+                df_parameters_opt.to_csv(f, header=f.tell() == 0)
+                index_df +=1
+
+    
     if forecast.plot:
         with open(f'{output_path}/output-{output_label}/skill_correlation-{predictand.var}.json', 'w') as fp:
             json.dump(dict_skills_pattern, fp)

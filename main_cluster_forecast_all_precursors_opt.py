@@ -108,7 +108,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
     # load forecast_nn-parameters
     method_name = 'ward'
-    k = 5
+    k = 6
     forecast = Forecast(inifile, cl_config, k, method_name)
     logger.info("Clusters: " + str(forecast.k))
 
@@ -122,6 +122,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     predictand.calculate_clusters_from_test_data(y_train, forecast.method_name, forecast.k)
 
     def skill(x, info):
+
         if lat_range(x) < 0 or lon_range(x) < 0:
             return 1
 
@@ -169,16 +170,27 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
             np.array(y_test[f"{predictand.var}"]), forecast_data)
         # display information
         # display information
+
         skills_score_mena = np.nanmean(skills_score_predictor)
         ax_mena = np.nanmean(ax_predictor)
         corr_mena = np.nanmean(corr_predictor)
+
         time_correlation_mean = np.nanmean(time_correlation)
+
         # if info['best_values'] <= time_correlation_mean:
         #     info['best_values'] = time_correlation_mean
         if info['best_values'] <= skills_score_mena:
             info['best_values'] = skills_score_mena
             logger.info(f"{x[0]:4f} {x[1]:4f} {x[2]:4f} {x[3]:4f} {time_correlation_mean:4f} {skills_score_mena:4f} "
                         f"{corr_mena:4f} {ax_mena:4f} {info['Nfeval']}")
+
+        # if info['Nfeval'] % 2 == 0:
+        #     logger.info(f"{x[0]:4f} {x[1]:4f} {x[2]:4f} {x[3]:4f} {time_correlation_mean}")
+
+        # if info['best_values'] >= time_correlation_mean:
+        #     info['best_values'] = time_correlation_mean
+        #     logger.info(f"{x[0]:4f} {x[1]:4f} {x[2]:4f} {x[3]:4f} {time_correlation_mean} {info['Nfeval']}")
+
         info['Nfeval'] += 1
         # if math.isnan(time_correlation_mean):
         #     return 1.

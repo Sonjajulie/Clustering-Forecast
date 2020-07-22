@@ -123,6 +123,7 @@ class Composites:
                 self.cross_size = float(self.config[prec]["hashsize"])
                 if self.config.has_option(prec, "rectangle"):
                     self.rectangle[self.var] = int(self.config[prec]["rectangle"])
+                self.logger.info(f"finished model")
             else:
                 # since models have the same time and variable, an artificial time must
                 # be created with time = model*time
@@ -140,9 +141,13 @@ class Composites:
                     self._set_area_composite(f"{self.var}_{file}", prec)
                     if self.config.has_option(prec, "mask"):
                         self._get_and_apply_mask(f"{self.var}_{file}", prec)
+                    self.logger.info(f"start model {file}")
                     self._transform_to_1d_and_remove_nans(f"{self.var}_{file}")
                     ##############################################################
                     self._calculate_standardized_precursors(f"{self.var}_{file}")
+                    self.logger.info(f"finished model {file}")
+
+                    
                 if self.config.has_option(prec, "map_proj"):
                     self.map_proj_nr[self.var] = int(self.config[prec]["map_proj"])
                 self.fig_size[self.var] = int(self.config[prec]["figsize"])
@@ -153,10 +158,13 @@ class Composites:
                 # change dimenson of precursor  to changed to dim = [time*models,lons,lats]!
                 # list_time_model = [f"{i + 1}: {j}" for i in range(len(self.list_of_files))
                 #                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
+
                 list_time_model = [f"model {imodel + 1}, date: {jtime.year}-{jtime.month}-{jtime.day}" for imodel
                                    in range(length_files)
                                    for jtime in self.dict_precursors_var[f"{self.var}_{imodel}"].coords['time'].values]
-                self.logger.debug(f"dims {self.label_lat}, {self.label_lon}")
+
+                self.logger.info(f"dims {self.label_lat}, {self.label_lon}")
+                self.logger.info(f"dims {np.array(self.dict_precursors_var.values()).shape}")
                 self.dict_precursors[self.var] = xr.DataArray(np.concatenate(list(self.dict_precursors_var.values())),
                                                               coords={'time': list_time_model,
                                                                       'lon': self.dict_precursors_var[
@@ -360,6 +368,7 @@ class Composites:
         self.varmean = np.mean(self.dict_prec_1D_var[label], axis=0)
         # self.varmean = np.nanmean(self.dict_prec_1D_var[label].flatten('F'), axis=0)
         self.varAnom = self.dict_prec_1D_var[label] - self.varmean
+
         # if self.output_label == "standardized" or self.output_label == "standardized-opt":
         #     self.sigma_var = np.std(self.varAnom, axis=0)# np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
         #     self.sigma_var[self.sigma_var == 0] = 1
@@ -479,6 +488,7 @@ class Composites:
                     if self.cut_area[self.var]:
                         self.var = self.config[prec]["name"]
                         # self._get_dim_boundaries(self.var)
+
                         # ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
                         ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
                                        self.lat_max[self.var]])

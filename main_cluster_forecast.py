@@ -37,6 +37,14 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     precursors = Precursors(inifile, output_label, cl_config)
     all_precs_names = [x for x in precursors.dict_precursors.keys()]
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+    # Calculate forecast_nn for all years
+    for year in range(int(forecast.beg_year), int(forecast.beg_year) + 3):  # int(forecast_nn.end_year)
+=======
+    # Calculate forecast_nn for all years
+    for year in range(int(forecast.beg_year), int(forecast.end_year)):  # int(forecast_nn.end_year)
+>>>>>>> 578d8e078ac06cb17cc3eca835d25d0ee31731a0
 
     for forecast_predictands in forecast.list_precursors_combinations:
         # Calculate forecast_nn for all years

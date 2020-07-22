@@ -78,6 +78,7 @@ class Clusters:
         logging.config.dictConfig(cl_config)
         self.logger = logging.getLogger(__name__)
         self.logger.info('Read ini-file')
+        self.logger.info(inifile_in)
         self.inifile = inifile_in
         # https://docs.python.org/3/library/configparser.html
         self.config = configparser.ConfigParser()
@@ -276,7 +277,10 @@ class Clusters:
         set directories for plots
         :param directory: directory for images
         """
-        self.directory_plots = f"{directory}"
+        # self.directory_plots = f"{self.output_path}/{directory}"
+
+        Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
+        self.logger.info(f"self.directory_plots: {self.directory_plots}")
 
     def _set_directory_files(self, directory):
         """
@@ -284,6 +288,11 @@ class Clusters:
         :param directory: directory for images
         """
         self.directory_files = f"{directory}"
+        # self.directory_files = f"{self.output_path}/{directory}"
+
+        Path(self.directory_files).mkdir(parents=True, exist_ok=True)
+        self.logger.info(f"self.directory_files: {self.directory_files}")
+
 
     def _set_clusters_1d(self):
         """ set 1d clusters from f"""
@@ -330,14 +339,16 @@ class Clusters:
         # self.varAnom = self.dict_pred_1D[label] - np.mean(self.dict_pred_1D[label], axis=0)
         # divided by grid (1d-Array) and years - 1 (the year which we would like to forecast_nn)
         # standardize
+
         # if self.output_label == "standardized" or self.output_label == "standardized-opt":
         #     self.sigma_var = np.std(self.varAnom, axis=0)# np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
         #     self.sigma_var[self.sigma_var == 0] = 1
         #     self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var
-        if self.output_label == "standardized" or self.output_label == "standardized-opt":
+        if self.output_label == "standardized" or self.output_label == "standardized-opt" or self.output_label == "standardized-opt2":
             # self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
             self.sigma_var[label]  = np.std(self.varAnom.flatten('F'), axis=0)
             self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var[label]
+
         else:
             self.dict_standardized_pred_1D[label] = self.varAnom
 
@@ -362,10 +373,9 @@ class Clusters:
         # set directories for plots and files
         self._set_directory_plots(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/plots/")
-        Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
+
         self._set_directory_files(f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
                                   f"{self.method_name}_Cluster_{self.k}/files/")
-        Path(self.directory_files).mkdir(parents=True, exist_ok=True)
 
     def _cluster_frequency(self):
         """

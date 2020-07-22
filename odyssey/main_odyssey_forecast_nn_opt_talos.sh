@@ -2,7 +2,7 @@
 #SBATCH -J clusters_$pred
 #SBATCH -p shared # Partition
 #SBATCH -n 1
-#SBATCH -t 2-00:00  # Runtime in D-HH:MM, minimum of 10 minutes
+#SBATCH -t 5-00:00  # Runtime in D-HH:MM, minimum of 10 minutes
 #SBATCH --mem=24G  # Memory request (16Gb)
 #SBATCH --ntasks-per-node=16
 #SBATCH -o output_$pred.out
@@ -18,5 +18,4 @@ echo $pred
 module load python
 source activate clustering-forecast
 
-python3 ../main_cluster_forecast_all_precursors_nn_opt.py -ini ../ini/clusters_America_${pred}_Forecast_opt.ini --outputlabel $outputlabel --predictand $pred --logfile logs/log_${pred}.log --datarange $datamin $datamax
-
+python3 ../main_cluster_forecast_nn_talos.py -ini ../ini/clusters_America_${pred}_Forecast_opt.ini --outputlabel $outputlabel --predictand $pred --logfile logs/log_${pred}.log --datarange $datamin $datamax
