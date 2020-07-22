@@ -1,5 +1,5 @@
 #!/bin/tcsh
-#SBATCH -J cl_f_$var_$pred
+#SBATCH -J cl_f_${var}_${pred}
 #SBATCH -n 4
 #SBATCH -t 24:00:00
 #SBATCH -A UHAR0013

@@ -5,10 +5,10 @@
 
 # variables in array:
 
-set predictand = (prec_t TS)
+set predictand = (prec_t)
 
 # possible precursors
-set arr = (FSNO ICEFRAC Z500 SST  PSL)
+set arr = (FSNO ICEFRAC Z500 SST PSL SST-Pacific FSNO-America)
 # set arr = (FSNO ICEFRAC)
 
 foreach pred ($predictand)
@@ -16,7 +16,7 @@ foreach pred ($predictand)
     # set last parameter to -1 if all states from predictand should be
     # taken, otherwise set length of precursors
     # 5th argument is for bootstrap method.
-    sbatch --output=output_cl_${var}_${pred}.out --error=error_cl_${var}_${pred}.err --job-name=cl_f_$var_$pred main_casper_forecast_opt.sh $var $pred standardized
+    sbatch --output=output_cl_${var}_${pred}.out --error=error_cl_${var}_${pred}.err --job-name=cl_f_${var}_${pred} main_casper_forecast_opt.sh $var $pred standardized
     end
 end
 
