@@ -21,8 +21,9 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
     # load inifile according to variable
     inifile = cl_parser.arguments['inifile']
+    output_path = cl_parser.arguments['outputpath']
     output_label = cl_parser.arguments['outputlabel']
-    predictand = Predictand(inifile, output_label, cl_config)
+    predictand = Predictand(inifile, output_path, output_label, cl_config)
     # load forecast_nn-parameters
     method_name = 'ward'
     k = 5
@@ -36,48 +37,52 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     precursors = Precursors(inifile, output_label, cl_config)
     all_precs_names = [x for x in precursors.dict_precursors.keys()]
 
-    # Calculate forecast_nn for all years
-    for year in range(int(forecast.beg_year), int(forecast.beg_year) + 3):  # int(forecast_nn.end_year)
 
-        # Calculate clusters of precursors for var, by removing one year
-        predictand.calculate_clusters_year(forecast.method_name, forecast.k, year - forecast.beg_year)
+    for forecast_predictands in forecast.list_precursors_combinations:
+        # Calculate forecast_nn for all years
+        forecast.list_precursors = forecast_predictands
+        # Calculate forecast_nn for all years
+        for year in range(int(forecast.beg_year), int(forecast.beg_year) + 3):  # int(forecast_nn.end_year)
 
-        # Calculate composites
-        precursors.get_composites_data_1d_year(year - forecast.beg_year, predictand.f, forecast.k, forecast.method_name,
-                                          predictand.var)
+            # Calculate clusters of precursors for var, by removing one year
+            predictand.calculate_clusters_year(forecast.method_name, forecast.k, year - forecast.beg_year)
 
-        # Prediction
-        forecast_temp = forecast.prediction(predictand.clusters, precursors.dict_composites,
-                                            precursors.dict_prec_1D, year - forecast.beg_year)
+            # Calculate composites
+            precursors.get_composites_data_1d_year(year - forecast.beg_year, predictand.f, forecast.k, forecast.method_name,
+                                              predictand.var)
 
-        # Assign forecast_nn data to array
-        forecast_data[year - forecast.beg_year] = forecast_temp
+            # Prediction
+            forecast_temp = forecast.prediction(predictand.clusters, precursors.dict_composites,
+                                                precursors.dict_prec_1D, year - forecast.beg_year)
 
-        # Calculate pattern correlation
-        pattern_corr_values.append(stats.pearsonr(forecast_data[year - forecast.beg_year],
-                                                  predictand.dict_standardized_pred_1D[f"{predictand.var}"][
-                                                      year - forecast.beg_year])[0])
+            # Assign forecast_nn data to array
+            forecast_data[year - forecast.beg_year] = forecast_temp
 
-    # Calculate time correlation for each point
-    time_correlation, significance = forecast.calculate_time_correlation(
-        predictand.dict_standardized_pred_1D[f"{predictand.var}"],
-        forecast_data, predictand.time_start_file)
+            # Calculate pattern correlation
+            pattern_corr_values.append(stats.pearsonr(forecast_data[year - forecast.beg_year],
+                                                      predictand.dict_standardized_pred_1D[f"{predictand.var}"][
+                                                          year - forecast.beg_year])[0])
 
-    # Reshape correlation maps
-    pred_t_corr_reshape = np.reshape(time_correlation, (predictand.dict_predict[predictand.var].shape[1],
-                                                        predictand.dict_predict[predictand.var].shape[2]))
-    significance_corr_reshape = np.reshape(significance, (predictand.dict_predict[predictand.var].shape[1],
-                                                          predictand.dict_predict[predictand.var].shape[2]))
+        # Calculate time correlation for each point
+        time_correlation, significance = forecast.calculate_time_correlation(
+            predictand.dict_standardized_pred_1D[f"{predictand.var}"],
+            forecast_data, predictand.time_start_file)
 
-    logger.info(f'time correlation: {np.nanmean(pred_t_corr_reshape)}')
-    logger.info(f'pattern correlation: {np.nanmean(pattern_corr_values)}')
+        # Reshape correlation maps
+        pred_t_corr_reshape = np.reshape(time_correlation, (predictand.dict_predict[predictand.var].shape[1],
+                                                            predictand.dict_predict[predictand.var].shape[2]))
+        significance_corr_reshape = np.reshape(significance, (predictand.dict_predict[predictand.var].shape[1],
+                                                              predictand.dict_predict[predictand.var].shape[2]))
 
-    # Plot correlation map, if specified in ini-file
-    if forecast.plot:
-        logger.info("Plot and save variables")
-        ex = ExportVarPlot(cl_config)
-        ex.save_plot_and_time_correlation(forecast.list_precursors, predictand, pred_t_corr_reshape,
-                                          significance_corr_reshape, all_precs_names)
+        logger.info(f'time correlation: {np.nanmean(pred_t_corr_reshape)}')
+        logger.info(f'pattern correlation: {np.nanmean(pattern_corr_values)}')
+
+        # Plot correlation map, if specified in ini-file
+        if forecast.plot:
+            logger.info("Plot and save variables")
+            ex = ExportVarPlot(cl_config)
+            ex.save_plot_and_time_correlation(forecast.list_precursors, predictand, pred_t_corr_reshape,
+                                              significance_corr_reshape, all_precs_names)
 
 
 if __name__ == '__main__':
