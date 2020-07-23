@@ -27,7 +27,7 @@ from scipy import stats
 import pandas as pd
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import matplotlib.ticker as mticker
-
+import matplotlib.patches as mpatches
 # from xscale import signal
 # seed the pseudorandom number generator
 
@@ -410,7 +410,7 @@ class Composites:
             self._create_dataset_from_composites(prec, k)
             n_rows1 = min(k, 4)
             n_cols1 = np.ceil(k / n_rows1)
-            if self.var == "ICEFRAC" or self.var == "FSNO":
+            if self.var == "ICEFRAC" or self.var == "FSNO" or self.var == "FSNO-America":
                 # for significance plotting --> ice and snow should be also
                 # plotted for 95 %
                 hatches_ = ["/////", "...", None, None, "...", "/////", None]
@@ -484,7 +484,14 @@ class Composites:
                                            (self.dict_precursors[self.var].shape[1],
                                             self.dict_precursors[self.var].shape[2])),  # alpha=0.0,
                                 levels=levels_, hatches=hatches_, colors='none', transform=ccrs.PlateCarree())
-
+                    # # add optimized region
+                    ax.add_patch(mpatches.Rectangle(xy=[self.rectangle[self.var][0], self.rectangle[self.var][1]],
+                                                    width=(self.rectangle[self.var][2] - self.rectangle[self.var][0]),
+                                                    height=(self.rectangle[self.var][3] - self.rectangle[self.var][1]),
+                                                    edgecolor='blue',
+                                                    facecolor='blue',
+                                                    alpha=0.05,
+                                                    transform=ccrs.PlateCarree()))
                     if self.map_proj_nr[self.var] == 0 or self.map_proj_nr[self.var] == 4:
                         gl = ax.gridlines(draw_labels=True,
                                           linewidth=0.02, color='gray', linestyle='--')

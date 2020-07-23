@@ -38,6 +38,72 @@ import tensorflow as tf
 from scipy import stats
 import pandas as pd
 
+def wrapper_function_cluster_corr(clusters_1d: np.array, observations: np.array, k: int, batch_size_in: int):
+    """
+    This is a wrapper function for a loss function because keras only accepts loss-functions with two input-parameter.
+    Hence all other parameters must be set through this function (and then it magically works).
+    :param clusters_1d: contain all k 1d clusters
+    :param observations: contain all observational data
+    :param k: number of clusters
+    :param batch_size_in: size of batches, normally 32
+    Problem is that keras accept only functions that have y_pred and y_true as arguments
+    """
+
+    def loss(y_true, y_pred):
+        """
+        define own loss function in order to get the correct projection coefficients of our predictand. In this case
+        we calculate the mean square error function of the output
+        :param y_pred: forecast calculated with the betas, which we get from the NN as input()
+        :param y_true: This is a k-len vector with the first index showing the number for the observational data
+        """
+
+        # seems like that first time this function is called y_true is None, there for this workaround
+        batch_size = tf.shape(y_true)[0]
+        if batch_size is None:
+            batch_size = tf.constant(batch_size_in, dtype=np.int32)
+        pred_corr = tf.zeros(shape=tf.shape(observations), dtype="float32")
+        # body for tf.while_loop
+        def body(i_batch_body, batch_size_body, cl_loss_body):
+            # to cast from tf.float32 to tf.int32
+            index = tf.dtypes.cast(y_true[i_batch_body, 0], tf.int32)
+            # get observation for certain year and index of batch
+            observations_year = tf.convert_to_tensor(observations, np.float32)[index]
+            # create tensorflow array with dimension of len(observations_year)
+            pred = tf.zeros(shape=tf.shape(observations_year), dtype="float32")
+            clusters_1d_tf = tf.convert_to_tensor(clusters_1d, np.float32)
+
+            # go through for-loop and add y_pred to tensorflow array
+            for i in range(int(k)):
+                cluster_i = tf.gather(clusters_1d_tf, i)
+                y_pred_projection_beta = y_pred[i_batch_body, i]
+                pred = pred + y_pred_projection_beta * cluster_i
+            pred_corr[i_batch_body] = pred
+            cl_loss_body = tf.add(cl_loss_body, K.mean(K.square(tf.squeeze(pred) - observations_year), axis=-1))
+            # tf.print("pred:", [tf.shape(pred), pred], output_stream=sys.stdout)
+            return [tf.add(i_batch_body, 1), batch_size_body, cl_loss_body]
+
+        # if condition for tf.while_loop
+        # noinspection PyUnusedLocal
+        def condition(i_batch_condition, batch_size_condition, cl_loss_condition):
+            return tf.less(i_batch_condition, batch_size_condition)
+
+        # initialize of tf.while_loop parameters
+        cl_loss = tf.constant(0.)
+        i_batch = tf.constant(0, dtype=np.int32)
+        # call tf.while_loop according to the website:
+        i_batch, batch_size, result = tf.while_loop(condition, body, [i_batch, batch_size, cl_loss])
+
+        # tf.print("result:", [tf.shape(result), result], output_stream=sys.stdout)
+        # tf.truediv enforces python v3 division semantics
+        return 1.0 - tf.reduce_mean(tfp.stats.correlation(observations, pred_corr, sample_axis=0, event_axis=None))
+
+
+
+
+    return loss
+
+
+
 
 def wrapper_function_cluster_rmse(clusters_1d: np.array, observations: np.array, k: int, batch_size_in: int):
     """
@@ -78,7 +144,8 @@ def wrapper_function_cluster_rmse(clusters_1d: np.array, observations: np.array,
                 cluster_i = tf.gather(clusters_1d_tf, i)
                 y_pred_projection_beta = y_pred[i_batch_body, i]
                 pred = pred + y_pred_projection_beta * cluster_i
-                cl_rmse_body = tf.add(cl_rmse_body, K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)))
+                # ~ cl_rmse_body = tf.add(cl_rmse_body, K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)))
+            cl_rmse_body = tf.add(cl_rmse_body, K.sqrt(K.mean(K.square(pred - observations_year), axis=-1)))
             # tf.print("pred:", [tf.shape(pred), pred], output_stream=sys.stdout)
             return [tf.add(i_batch_body, 1), batch_size_body, cl_rmse_body]
 
@@ -138,7 +205,7 @@ def wrapper_function_cluster_loss(clusters_1d: np.array, observations: np.array,
                 cluster_i = tf.gather(clusters_1d_tf, i)
                 y_pred_projection_beta = y_pred[i_batch_body, i]
                 pred = pred + y_pred_projection_beta * cluster_i
-                cl_loss_body = tf.add(cl_loss_body, K.mean(K.square(tf.squeeze(pred) - observations_year), axis=-1))
+            cl_loss_body = tf.add(cl_loss_body, K.mean(K.square(tf.squeeze(pred) - observations_year), axis=-1))
             # tf.print("pred:", [tf.shape(pred), pred], output_stream=sys.stdout)
             return [tf.add(i_batch_body, 1), batch_size_body, cl_loss_body]
 
@@ -563,31 +630,36 @@ class ForecastNN(Forecast):
             plt.savefig(f"{file_path}/progress_wr_cl_loss_{self.nr_neurons}_neurons_{self.k}_cluster_"
                         f"{forecast_predictands}.pdf", bbox_inches='tight')
             plt.close('all')
-            
-    # ~ def prediction_nn(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, data_year_1d: dict,
-                      # ~ year: int):
-        # ~ """make forecast_nn
-        # ~ :param forecast_predictands: list contains predictands which should be used to forecast
-        # ~ :param clusters_1d: dict of all k-clusters
-        # ~ :param composites_1d: dict of composites with time and one-dimensional array
-        # ~ :param data_year_1d: np.ndarray with all  data of precursors
-        # ~ :param year: year which should be forecasted
-        # ~ """
-        # ~ # Merge only those precursors which were selected
-        # ~ self.selected_composites_1D = np.hstack([composites_1d[i] for i in forecast_predictands])
-        # ~ self.selected_data_1d = np.hstack([data_year_1d[i] for i in forecast_predictands])
+         
+         
+    def prediction_nn_model(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, data_year_1d: dict,
+                      year: int):
+        """make forecast_nn
+        :param forecast_predictands: list contains predictands which should be used to forecast
+        :param clusters_1d: dict of all k-clusters
+        :param composites_1d: dict of composites with time and one-dimensional array
+        :param data_year_1d: np.ndarray with all  data of precursors
+        :param year: year which should be forecasted
+        """
+        # Merge only those precursors which were selected
+        self.selected_composites_1D = np.hstack([composites_1d[i] for i in forecast_predictands])
+        self.selected_data_1d = np.hstack([data_year_1d[i] for i in forecast_predictands])
 
-        # ~ # need those additional brackets, because it can be multiple input data and the outer brackets indicate the
-        # ~ # the length of the input data
-        # ~ self.alpha_all = np.asarray([self._projection_coefficients_year(year)])
-        # ~ # Calculate projection coefficients
-        # ~ self.beta_all = np.zeros(self.k)
-        # ~ self.beta_all = self.model.predict(self.alpha_all)[0]
+        # need those additional brackets, because it can be multiple input data and the outer brackets indicate the
+        # the length of the input data
+        self.alpha_all = np.asarray([self._projection_coefficients_year(year)])
 
-        # ~ self.forecast_var = np.zeros(len(clusters_1d[0]))
-        # ~ for i in range(int(self.k)):
+        # Calculate projection coefficients
+        self.beta_all = np.zeros(self.k)
+        self.beta_all = self.model.predict(self.alpha_all)[0]
+        
+        self.alpha_all = np.asarray(self._projection_coefficients_year(year))
+        
+        self.forecast_var = np.zeros(len(clusters_1d[0]))
+        for i in range(int(self.k)):
             # ~ self.forecast_var += self.beta_all[i] * clusters_1d[int(i)]
-        # ~ return self.forecast_var
+            self.forecast_var += self.alpha_all[i] * clusters_1d[int(i)]
+        return self.forecast_var  
 
     def calc_alphas_for_talos(self, X_train: dict, y_train: np.array, params):
         # Merge only those precursors which were selected
@@ -642,7 +714,10 @@ class ForecastNN(Forecast):
         self.model_ta.add(
             Dense(self.k, activation=params['last_activation'], kernel_initializer=params['kernel_initializer']))
 
-        wr_cl_loss = wrapper_function_cluster_loss(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
+        # ~ wr_cl_loss = wrapper_function_cluster_loss(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
+                                                   # ~ params['batch_size'])
+
+        wr_cl_loss = wrapper_function_cluster_corr(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
                                                    params['batch_size'])
 
         self.model_ta.compile(
@@ -696,7 +771,7 @@ class ForecastNN(Forecast):
         "lr": params["lr"],
         "activation": "relu",
         "kernel_initializer": "random_uniform",
-         "optimizer": "Adam",
+         "optimizer": params['optimizer'],
          "losses": "logcos",
          "shapes": "brick",
          'first_neuron': [16],
