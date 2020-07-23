@@ -30,7 +30,7 @@ import matplotlib.ticker as mticker
 import matplotlib.patches as mpatches
 # from xscale import signal
 # seed the pseudorandom number generator
-
+import statistics
 
 # seed random number generator
 np.random.seed(0)
@@ -76,6 +76,7 @@ class Composites:
         self.lons, self.lats = None, None
         self.lons1, self.lats1 = None, None
         self.map_proj_nr = {}
+        self.rectangle = {}
         self.output_label = output_label
         self.output_path = output_path
         self.percent_boot = None
@@ -99,6 +100,7 @@ class Composites:
                 self._set_area_composite(self.var, prec)
                 if self.config.has_option(prec, "mask"):
                     self._get_and_apply_mask(self.config[prec]["name"], prec)
+
                 self._transform_to_1d_and_remove_nans(self.config[prec]["name"])
                 self._calculate_standardized_precursors(self.var)
                 list_time_model = []
@@ -119,6 +121,8 @@ class Composites:
                 self.fig_size[self.var] = int(self.config[prec]["figsize"])
                 self.aspect[self.var] = int(self.config[prec]["aspect"])
                 self.cross_size = float(self.config[prec]["hashsize"])
+                if self.config.has_option(prec, "rectangle"):
+                    self.rectangle[self.var] = int(self.config[prec]["rectangle"])
                 self.logger.info(f"finished model")
             else:
                 # since models have the same time and variable, an artificial time must
@@ -149,7 +153,8 @@ class Composites:
                 self.fig_size[self.var] = int(self.config[prec]["figsize"])
                 self.aspect[self.var] = int(self.config[prec]["aspect"])
                 self.cross_size = float(self.config[prec]["hashsize"])
-
+                if self.config.has_option(prec, "rectangle"):
+                    self.rectangle[self.var] = list(map(float, self.config[prec]["rectangle"].split(',')))
                 # change dimenson of precursor  to changed to dim = [time*models,lons,lats]!
                 # list_time_model = [f"{i + 1}: {j}" for i in range(len(self.list_of_files))
                 #                    for j in self.dict_predict[f"{self.var}_{i}"].coords['time'].values]
@@ -184,17 +189,18 @@ class Composites:
 
     def _initialize_attributes(self):
         """ initialize dictionaries for composites and plot properties"""
+
+        self.composites_reshape = {}
+        self.composites_significance_x = {}
+        self.composites_significance_y = {}
+        self.composites_significance = {}
+        self.cluster_frequency = []
         self.dict_precursors = {}
         self.dict_mask = {}
         self.dict_prec_1D = {}
         self.dict_composites = {}
         self.dict_standardized_precursors = {}
         self.data_vars = {}
-        self.composites_reshape = {}
-        self.composites_significance_x = {}
-        self.composites_significance_y = {}
-        self.composites_significance = {}
-        self.cluster_frequency = []
 
     def _set_area_composite(self, label: str, config_var: str):
         """
@@ -247,18 +253,22 @@ class Composites:
         # check name for latitude and longitude and cut area accordingly
         #  https://stackoverflow.com/questions/29135885/netcdf4-extract-for-subset-of-lat-lon
         self.var = var
+        self.dict_precursors_cut = {}
         if self.label_lat == "latitude":
             self.cut_area[self.var] = True
             self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var], self.lat_max[self.var] = cut_array
-            self.dict_precursors[self.var] = self.dict_precursors[self.var].sel(latitude=slice(
+            self.dict_precursors_cut[self.var] = self.dict_precursors[self.var].sel(latitude=slice(
                 cut_array[0], cut_array[1]),longitude=slice(cut_array[2], cut_array[3]))
-
+            # self.dict_precursors_cut[self.var] = self.dict_precursors[self.var].sel(latitude=slice(
+            #     cut_array[0], cut_array[1]),longitude=slice(cut_array[2], cut_array[3]))
 
         elif self.label_lat == "lat":
             self.cut_area[self.var] = True
             self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var], self.lat_max[self.var] = cut_array
             self.dict_precursors_cut[self.var] = self.dict_precursors[self.var].sel(lat=slice(
                 cut_array[0], cut_array[1]),lon=slice(cut_array[2], cut_array[3]))
+            # self.dict_precursors_cut[self.var] = self.dict_precursors[self.var].sel(lat=slice(
+            #     cut_array[0], cut_array[1]),lon=slice(cut_array[2], cut_array[3]))
         else:
             raise ValueError("Spatial attribute (e.g. latitude and longitude) not found!")
 
@@ -268,8 +278,8 @@ class Composites:
         self.dict_prec_1D[self.var][self.dict_prec_1D[self.var] != self.dict_prec_1D[self.var]] = 0
         self.varmean = np.mean(self.dict_prec_1D[self.var], axis=0)
         self.varAnom = self.dict_prec_1D[self.var] - self.varmean
-        if self.output_label == "standardized" or self.output_label == "standardized-opt" or self.output_label == "standardized-opt2":
-            self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+        if self.output_label == "standardized" or self.output_label == "standardized-opt":
+            self.sigma_var = np.std(self.varAnom.flatten('F'), axis=0)
             self.dict_standardized_precursors[self.var] = self.varAnom / self.sigma_var
         else:
             self.dict_standardized_precursors[self.var] = self.varAnom
@@ -356,9 +366,16 @@ class Composites:
         """
         self.logger.info("Calculate Standardized values")
         self.varmean = np.mean(self.dict_prec_1D_var[label], axis=0)
+        # self.varmean = np.nanmean(self.dict_prec_1D_var[label].flatten('F'), axis=0)
         self.varAnom = self.dict_prec_1D_var[label] - self.varmean
-        if self.output_label == "standardized" or self.output_label == "standardized-opt" or self.output_label == "standardized-opt2":
-            self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+
+        # if self.output_label == "standardized" or self.output_label == "standardized-opt":
+        #     self.sigma_var = np.std(self.varAnom, axis=0)# np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+        #     self.sigma_var[self.sigma_var == 0] = 1
+        #     self.dict_standardized_precursors_var[label] = self.varAnom / self.sigma_var
+        if self.output_label == "standardized" or self.output_label == "standardized-opt":
+            # self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+            self.sigma_var = np.std(self.varAnom.flatten('F'), axis=0)
             self.dict_standardized_precursors_var[label] = self.varAnom / self.sigma_var
         else:
             self.dict_standardized_precursors_var[label] = self.varAnom
@@ -376,12 +393,20 @@ class Composites:
         self.dict_standardized_precursors[key] = np.array(self.dict_standardized_precursors[key])
         self.dict_composites[key] = np.zeros((int(k), self.dict_standardized_precursors[key].shape[1]),
                                              dtype=np.float64)
-
+        self.dict_composites_std = np.zeros((int(k)))
         for i_cl, cluster_nr in enumerate(f):
             self.dict_composites[key][cluster_nr] += self.dict_standardized_precursors[key][i_cl]
+            self.dict_composites_std[cluster_nr]  += np.mean(np.std(self.dict_standardized_precursors[key][i_cl]))
 
         for i_cl in range(int(k)):
             self.dict_composites[key][i_cl] = np.divide(self.dict_composites[key][i_cl], (self.cluster_frequency[i_cl]))
+            self.dict_composites_std[i_cl] = np.divide(self.dict_composites_std[i_cl], (self.cluster_frequency[i_cl]))
+            # normalize to sigma = 1?
+            # self.sigma_var = np.std(self.dict_composites[key][i_cl].flatten('F'), axis=0)
+            # self.sigma_var_all = np.std(self.dict_standardized_precursors[key].flatten('F'), axis=0)
+            self.sigma_var = np.std(self.dict_composites[key][i_cl], axis=0)
+            self.dict_composites[key][i_cl] = self.dict_composites[key][i_cl]  / self.sigma_var # * self.sigma_var_all
+
 
         self._set_directory_plots(
             f"output-{self.output_label}//{predictand}/Composites/{key}/{method_name}_Composite_{k}/plots/")
@@ -410,7 +435,7 @@ class Composites:
             self._create_dataset_from_composites(prec, k)
             n_rows1 = min(k, 4)
             n_cols1 = np.ceil(k / n_rows1)
-            if self.var == "ICEFRAC" or self.var == "FSNO" or self.var == "FSNO-America":
+            if self.var == "ICEFRAC" or self.var == "FSNO" or self.var == "FSNO-America" or self.var == "FSNO-Europe":
                 # for significance plotting --> ice and snow should be also
                 # plotted for 95 %
                 hatches_ = ["/////", "...", None, None, "...", "/////", None]
@@ -423,8 +448,8 @@ class Composites:
                 hatches_ = ["/////", None, None, "/////", None]
                 levels_ = [0, self.percent_boot, 50, 100 - self.percent_boot, 100]
             # n_cols1 = max(n, 1)
-            map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(), ccrs.LambertConformal(),
-                                 ccrs.Orthographic(0, 90), ccrs.PlateCarree(180)]
+            map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(central_longitude=-0), ccrs.LambertConformal(),
+                                 ccrs.Orthographic(0, 90), ccrs.PlateCarree(180), ccrs.PlateCarree(-180)]
             map_project = map_project_array[self.map_proj_nr[self.var]]
 
             lsize = 14
@@ -462,10 +487,15 @@ class Composites:
 
                     if self.cut_area[self.var]:
                         self.var = self.config[prec]["name"]
-                        self._get_dim_boundaries(prec)
+                        # self._get_dim_boundaries(self.var)
+
                         # ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
                         ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
                                        self.lat_max[self.var]])
+                        crs = ccrs.NorthPolarStereo()
+                        ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
+                                       self.lat_max[self.var]], crs=ccrs.PlateCarree())
+
 
                     self._calculate_significance(ip, k, self.var, percent_boot)
                     title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
@@ -484,6 +514,7 @@ class Composites:
                                            (self.dict_precursors[self.var].shape[1],
                                             self.dict_precursors[self.var].shape[2])),  # alpha=0.0,
                                 levels=levels_, hatches=hatches_, colors='none', transform=ccrs.PlateCarree())
+
                     # # add optimized region
                     ax.add_patch(mpatches.Rectangle(xy=[self.rectangle[self.var][0], self.rectangle[self.var][1]],
                                                     width=(self.rectangle[self.var][2] - self.rectangle[self.var][0]),
@@ -491,6 +522,14 @@ class Composites:
                                                     edgecolor='blue',
                                                     facecolor='blue',
                                                     alpha=0.05,
+                    # # # add optimized region rectangle = 40,75,90,160
+                    # ax.add_patch(mpatches.Rectangle(xy=[self.rectangle[self.var][2], self.rectangle[self.var][0]],
+                    #                                 width=(self.rectangle[self.var][3] - self.rectangle[self.var][2]),
+                    #                                 height=(self.rectangle[self.var][1] - self.rectangle[self.var][0]),
+                    #                                 edgecolor='blue',
+                    #                                 fill=False,
+                    #                                 facecolor=None,
+                    #                                 # alpha=0.01,
                                                     transform=ccrs.PlateCarree()))
                     if self.map_proj_nr[self.var] == 0 or self.map_proj_nr[self.var] == 4:
                         gl = ax.gridlines(draw_labels=True,
@@ -510,10 +549,152 @@ class Composites:
                     # "extent" attribute above will be ignored
                     # ax.set_aspect("equal")
             plt.subplots_adjust(left=0.03, right=0.82, top=0.95, bottom=0.05)
+            if self.map_proj_nr[self.var] == 1:
+                plt.subplots_adjust(left=0.03, right=0.7, top=0.95, bottom=0.05)
             plt.savefig(f"{self.directory_plots}/composites.pdf")
             plt.close()
 
-    def plot_years(self, predictand: str, method_name: str, k: int, f: np.ndarray):
+
+
+
+    def save_one_composite_plot(self, k: int, percent_boot: float, prec, predictand, key, method_name):
+        """
+        save clusters into one plot using xarray library
+        :param k: cluster number
+        :param percent_boot: percentage for which composite is significant
+        """
+
+        self._set_directory_plots(
+            f"output-{self.output_label}//{predictand}/Composites/{key}/{method_name}_Composite_{k}/plots/")
+        Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
+        self._set_directory_files(
+            f"output-{self.output_label}//{predictand}/Composites/{key}/{method_name}_Composite_{k}/files/")
+        Path(self.directory_files).mkdir(parents=True, exist_ok=True)
+
+
+        self.percent_boot = percent_boot
+        self.logger.info("Plot composites")
+
+        self._create_dataset_from_composites(prec, k)
+        n_rows1 = min(k, 4)
+        n_cols1 = np.ceil(k / n_rows1)
+        if self.var == "ICEFRAC" or self.var == "FSNO" or self.var == "FSNO-America" or self.var == "FSNO-Europe":
+            # for significance plotting --> ice and snow should be also
+            # plotted for 95 %
+            hatches_ = ["/////", "...", None, None, "...", "/////", None]
+
+            levels_ = [0, self.percent_boot, self.percent_boot + 4, 50,
+                       100 - self.percent_boot - 4, 100 - self.percent_boot, 100]
+            if k == 5 or k == 7:
+                n_cols1 = 1
+        else:
+            hatches_ = ["/////", None, None, "/////", None]
+            levels_ = [0, self.percent_boot, 50, 100 - self.percent_boot, 100]
+        # n_cols1 = max(n, 1)
+        map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(central_longitude=-0), ccrs.LambertConformal(),
+                             ccrs.Orthographic(0, 90), ccrs.PlateCarree(180), ccrs.PlateCarree(-180)]
+        map_project = map_project_array[self.map_proj_nr[self.var]]
+
+        lsize = 14
+        axislsize = 9
+        plt.rc("legend", frameon=False, fontsize=lsize)
+        plt.rc("axes", labelsize=lsize, titlesize=lsize)
+        plt.rc("xtick", labelsize=lsize)
+        plt.rc("ytick", labelsize=lsize)
+        plt.rc("lines", linewidth=0.5)
+        plt.rc("figure", dpi=100)
+
+        p = self.data_vars[f"composite{self.var}"].plot(transform=ccrs.PlateCarree(),
+                                                        col='c',
+                                                        col_wrap=int(n_cols1),
+                                                        cmap=plt.cm.get_cmap('seismic', 31),
+                                                        subplot_kws={'projection': map_project},
+                                                        # size=5,  # 10, 3,  8
+                                                        size=self.fig_size[self.var],  # 10, 3,  8
+                                                        add_colorbar=False,
+                                                        # aspect=3,  # 2,  # 1.5
+                                                        aspect=self.aspect[self.var],  # 2,  # 1.5
+                                                        # cbar_kwargs={'shrink': 0.8, 'pad':0.02},
+                                                        )
+
+        p.fig.subplots_adjust(hspace=0.15, wspace=0.15)
+        p.add_colorbar(orientation="vertical",
+                       label=f"{self.dict_precursors[self.var].attrs['long_name']}["
+                             f"{self.dict_precursors[self.var].attrs['units']}]",
+                       shrink=0.8,
+                       aspect=30, pad=0.02)
+
+        for ip, ax in enumerate(p.axes.flat):
+            if ip < k:
+                ax.add_feature(cfeature.BORDERS, linewidth=0.1)
+                ax.add_feature(cfeature.COASTLINE, linewidth=0.1)
+                ax.gridlines(color="Gray", linestyle="dotted", linewidth=0.5)
+
+                if self.cut_area[self.var] :
+                    self.var = self.config[prec]["name"]
+                    # self._get_dim_boundaries(self.var)
+                    # ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
+                    # ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
+                    #                self.lat_max[self.var]])
+                    # crs = ccrs.NorthPolarStereo()
+                    ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
+                                   self.lat_max[self.var]], crs=ccrs.PlateCarree())
+                    # ax.set_extent([self.lon_min, self.lon_max, self.lat_min, (2 * self.lat_max - 90)])
+
+                self._calculate_significance(ip, k, self.var, percent_boot)
+                title = self.cluster_frequency[ip] / np.sum(self.cluster_frequency) * 100.
+                if self.var == "ICEFRAC" or self.var == "FSNO":
+                    lsize = 10
+                    ax.set_title(
+                        f"Composite {ip} ({title:4.2f}%), "
+                        f"p = {self.percent_boot:3.2f} % / {(self.percent_boot + 4):3.2f} %",
+                        fontsize=lsize)
+                else:
+                    ax.set_title(f"Composite {ip} ({title:4.2f}%), p = {self.percent_boot:3.2f} %", fontsize=lsize)
+                plt.rcParams['hatch.linewidth'] = 0.03  # hatch linewidth
+                plt.rcParams['hatch.color'] = 'k'  # hatch color --> black
+                ax.contourf(self.lons, self.lats,
+                            np.reshape(self.composites_significance[self.var][ip],
+                                       (self.dict_precursors[self.var].shape[1],
+                                        self.dict_precursors[self.var].shape[2])),  # alpha=0.0,
+                            levels=levels_, hatches=hatches_, colors='none', transform=ccrs.PlateCarree())
+                # add optimized region rectangle = 40,75,90,160
+                # ax.add_patch(mpatches.Rectangle(xy=[self.rectangle[self.var][2], self.rectangle[self.var][0]],
+                #                                 width=(self.rectangle[self.var][3] - self.rectangle[self.var][2]),
+                #                                 height=(self.rectangle[self.var][1] - self.rectangle[self.var][0]),
+                #                                 edgecolor='blue',
+                #                                 fill=False,
+                #                                 facecolor=None,
+                #                                 # alpha=0.01,
+                #                                 transform=ccrs.PlateCarree()))
+                if self.map_proj_nr[self.var] == 0 or self.map_proj_nr[self.var] == 4:
+                    gl = ax.gridlines(draw_labels=True,
+                                      linewidth=0.02, color='gray', linestyle='--')
+
+                    gl.xlabels_top = False
+                    gl.ylabels_right = False
+                    if n_cols1 > 1 and ip % n_cols1:
+                        gl.ylabels_left = False
+                    gl.xformatter = LONGITUDE_FORMATTER
+                    gl.yformatter = LATITUDE_FORMATTER
+                    gl.xlabel_style = {'size': axislsize, 'color': 'black'}
+                    gl.ylabel_style = {'size': axislsize, 'color': 'black'}
+                    gl.xlocator = mticker.FixedLocator([i for i in range(-180, 190, 30)])
+                    gl.ylocator = mticker.FixedLocator([i for i in range(-100, 100, 20)])
+                # Without this aspect attributes the maps will look chaotic and the
+                # "extent" attribute above will be ignored
+                # ax.set_aspect("equal")
+        plt.subplots_adjust(left=0.03, right=0.82, top=0.95, bottom=0.05)
+        if self.map_proj_nr[self.var] == 1:
+            plt.subplots_adjust(left=0.03, right=0.7, top=0.95, bottom=0.05)
+        plt.savefig(f"{self.directory_plots}/composites.pdf")
+        plt.savefig(f"{self.directory_plots}/composites.png")
+        plt.close()
+
+
+
+
+    def plot_years_forecasts(self, forecast, predictand: str, method_name: str, k: int, f: np.ndarray):
         """
         Plot composites for all years
         :param predictand: name of predictand/ cluster for saving in the correct folder
@@ -525,7 +706,7 @@ class Composites:
             # f"/glade/scratch/totz/
             self._set_directory_plots(
                 f"{self.output_path}/output-{self.output_label}/{predictand}/Composites/{self.var}/"
-                f"{method_name}_Composite_{k}/years/plots/")
+                f"{method_name}_Composite_{k}/years/plots_forecast/")
             Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
             self._set_directory_files(
                 f"{self.output_path}/output-{self.output_label}/{predictand}/Composites/{self.var}/"
@@ -558,10 +739,10 @@ class Composites:
                 # n_cols = max(n, 1)
                 map_project_array = [ccrs.PlateCarree(), ccrs.NorthPolarStereo(), ccrs.LambertConformal(),
                                      ccrs.Orthographic(0, 90)]
-                map_project = map_project_array[self.map_proj_nr[self.map_proj_nr[self.var]]]
+                map_project = map_project_array[self.map_proj_nr[self.var]]
                 ax = plt.axes(projection=map_project)
                 self.data_vars[f"{self.config[prec]['name']}"].plot(
-                    ax=ax,
+                    ax=ax, vmin=-40, vmax=40, extend ='both',
                     transform=ccrs.PlateCarree(),  # the data's projection
                     cmap=plt.cm.get_cmap('seismic', 31),
                     cbar_kwargs={'shrink': 0.8},
@@ -569,10 +750,12 @@ class Composites:
 
                 ax.add_feature(cfeature.BORDERS, linewidth=0.1)
                 ax.coastlines()
-                if self.cut_area:
-                    ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
-                                   (2 * self.lat_max[self.var] - 90)])
-                ax.set_aspect(self.aspect)
+                # if self.cut_area:
+                #     # ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
+                #     #                (2 * self.lat_max[self.var] - 90)])
+                #     ax.set_extent([self.lon_min[self.var], self.lon_max[self.var], self.lat_min[self.var],
+                #                    (self.lat_max[self.var])])
+                # ax.set_aspect(self.aspect[self.var])
                 ax.set_title(f"{self.var}, {self.dict_precursors[self.var].time.values[year]}, cluster: "
                              f"{f[year]}", fontsize=10)
                 self.logger.debug(
@@ -584,6 +767,11 @@ class Composites:
                     f"{self.directory_plots}/{year:05d}_{self.var}_{self.dict_precursors[self.var].time.values[year]}"
                     f".png")
                 plt.close()
+
+
+
+
+
 
     def time_plot(self, predictand: str, method_name: str, k: int, f: np.ndarray):
         """
@@ -692,14 +880,14 @@ class Composites:
         set directories for plots
         :param directory: path for plot directory
         """
-        self.directory_plots = f"{self.output_path}/{directory}"
+        self.directory_plots = f"{directory}"
 
     def _set_directory_files(self, directory: str):
         """
         set directories for plots
         :param directory: path for files directory
         """
-        self.directory_files = f"{self.output_path}/{directory}"
+        self.directory_files = f"{directory}"
 
     def _calculate_significance(self, ik: int, k: int, key: str, percent_boot: float):
         """calculate significance of composite using the bootstrap method

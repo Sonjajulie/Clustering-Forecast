@@ -15,7 +15,7 @@ if os.environ.get('DISPLAY', '') == '':
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import xarray as xr
+
 import configparser
 import pandas as pd
 import logging
@@ -29,6 +29,8 @@ from pathlib import Path
 import pickle
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import matplotlib.ticker as mticker
+import xarray as xr
+
 
 sns.set()
 
@@ -188,11 +190,13 @@ class Clusters:
         self.dict_predict = {}
         self.dict_pred_1D = {}
         self.dict_standardized_pred_1D = {}
+        self.dict_standardized_precursors_var = {}
         self.dict_standardized_pred_rmse_reshape = {}
         self.f = None
         self.k = None
         self.method_name = None
         self.pin_arrays = None
+        self.sigma_var = {}
         self.Z = None
         self.Z_dict = None
 
@@ -221,7 +225,7 @@ class Clusters:
         """
         self.dict_mask[self.config[self.sec]["var"]] = np.loadtxt(self.config[self.sec]["mask"])
         self.dict_predict[label] = self.dict_predict[label] \
-            .where(self.dict_mask[self.config[self.sec]["var"]] == 0, 0)
+            .where(self.dict_mask[self.config[self.sec]["var"]] == 0, np.nan)
 
     def _transform_to_1d_and_remove_nans(self, label: str):
         """
@@ -236,6 +240,7 @@ class Clusters:
                                               [np.array(self.dict_predict[label])
                                               .shape[0], -1])
         self.dict_pred_1D[label][self.dict_pred_1D[label] != self.dict_pred_1D[label]] = 0
+        self.mask = (self.dict_pred_1D[label] != np.nan)
 
     def _set_method_name(self, method_name: str):
         """
@@ -256,7 +261,7 @@ class Clusters:
         self.Z = linkage(self.dict_standardized_pred_1D[self.var], self.method_name)
 
     def _set_f(self):
-        """ get f (flat clusters) from cluster method using linkage, k and maxclust criterium"""
+        """ get f (flat clusters) from cluster method using linka0ge, k and maxclust criterium"""
         self.f = fcluster(self.Z, self.k, criterion='maxclust')
         # order according to frequency
         self.f_bins = np.bincount(self.f - 1)
@@ -272,7 +277,8 @@ class Clusters:
         set directories for plots
         :param directory: directory for images
         """
-        self.directory_plots = f"{directory}"
+        # self.directory_plots = f"{self.output_path}/{directory}"
+
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
         self.logger.info(f"self.directory_plots: {self.directory_plots}")
 
@@ -282,17 +288,29 @@ class Clusters:
         :param directory: directory for images
         """
         self.directory_files = f"{directory}"
+        # self.directory_files = f"{self.output_path}/{directory}"
+
         Path(self.directory_files).mkdir(parents=True, exist_ok=True)
         self.logger.info(f"self.directory_files: {self.directory_files}")
-        
+
+
     def _set_clusters_1d(self):
         """ set 1d clusters from f"""
         if not isinstance(self.dict_standardized_pred_1D[self.var], np.ndarray):
             self.dict_standardized_pred_1D[self.var] = np.array(self.dict_standardized_pred_1D[self.var])
         self.clusters = np.zeros((self.k, self.dict_standardized_pred_1D[self.var].shape[1]))
+        self.clusters_std = np.zeros((self.k))
         for cluster_number in range(self.k):
+            self.clusters_std[cluster_number] = \
+                np.mean(np.std(self.dict_standardized_pred_1D[self.var][self.f == cluster_number], axis=0))
             self.clusters[cluster_number] = \
                 np.mean(self.dict_standardized_pred_1D[self.var][self.f == cluster_number], axis=0)
+
+            # normalize clusters?
+            # self.sigma_var_all = np.std(self.dict_standardized_pred_1D[self.var].flatten('F'), axis=0)
+            self.sigma_var = np.std(self.clusters[cluster_number], axis=0)
+            self.clusters[cluster_number] = self.clusters[cluster_number] / self.sigma_var # * self.sigma_var_all
+
 
     def _set_clusters_reshape(self):
         """ reshape 1d clusterst to 2d clusters"""
@@ -309,13 +327,28 @@ class Clusters:
         :param label: name of variable. If one uses a cluster the variable name is the same for different
         model initialization and therefore I renamed the variable name.
         """
+        self.varstd = np.std(self.dict_pred_1D[label], axis=0)
+        # self.totalmean = np.mean(self.dict_pred_1D[label], axis=0)
+        self.mask = (self.varstd != 0.)
+        # mask2 = (self.varstd < 0.1)
+        # mask3 = (self.totalmean > 10.)
+        # self.varmean = np.ma.array(self.dict_pred_1D[label].flatten('F'), mask=np.repeat(mask2,self.dict_pred_1D[label].shape[0])).mean()
+        # self.varAnom = np.subtract(self.dict_pred_1D[label],self.varmean, where=mask3)
         self.varmean = np.mean(self.dict_pred_1D[label], axis=0)
         self.varAnom = self.dict_pred_1D[label] - self.varmean
+        # self.varAnom = self.dict_pred_1D[label] - np.mean(self.dict_pred_1D[label], axis=0)
         # divided by grid (1d-Array) and years - 1 (the year which we would like to forecast_nn)
         # standardize
+
+        # if self.output_label == "standardized" or self.output_label == "standardized-opt":
+        #     self.sigma_var = np.std(self.varAnom, axis=0)# np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+        #     self.sigma_var[self.sigma_var == 0] = 1
+        #     self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var
         if self.output_label == "standardized" or self.output_label == "standardized-opt" or self.output_label == "standardized-opt2":
-            self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
-            self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var
+            # self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+            self.sigma_var[label]  = np.std(self.varAnom.flatten('F'), axis=0)
+            self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var[label]
+
         else:
             self.dict_standardized_pred_1D[label] = self.varAnom
 
@@ -389,6 +422,7 @@ class Clusters:
             directories_files[i] = (f"{self.output_path}/output-{self.output_label}/{self.var}/Cluster/"
                                     f"{self.method_name}_Cluster_{self.k}/years/files/Cluster_{i}/")
             Path(directories_files[i]).mkdir(parents=True, exist_ok=True)
+
         for year in range(len(self.dict_standardized_pred_1D[self.var])):
             var_reshape = np.reshape(self.dict_standardized_pred_1D[self.var][year],
                                      (self.dict_predict[self.var].shape[1], self.dict_predict[self.var].shape[2]))
@@ -419,7 +453,7 @@ class Clusters:
             map_proj = ccrs.PlateCarree()
             ax = plt.axes(projection=map_proj)
             self.data_vars[f"cluster_{self.var}"].plot(
-                ax=ax,
+                ax=ax,vmin=-10, vmax=10, extend ='both',
                 transform=ccrs.PlateCarree(),  # the data's projection
                 cmap=plt.cm.get_cmap('seismic', 31),
                 cbar_kwargs={'shrink': 0.8},
@@ -530,12 +564,12 @@ class Clusters:
         """
         Plot and save elbow plot as well as 2. derivative of elbow plot
         """
-        fig3 = plt.figure()
+        fig3 = plt.figure(figsize=(12,6))
         last = self.Z[-10:, 2]
         last_reverse = last[::-1]
         cluster_number_array = np.arange(1, len(last) + 1)
-        plt.xlabel('Cluster number')
-        plt.ylabel('Distance')
+        plt.xlabel('Number of clusters')
+        plt.ylabel("Ward's minimal variance")
         plt.plot(cluster_number_array, last_reverse, marker='o', color='navy')
         # 2nd derivative of the distances
         acceleration = np.diff(last, 2)
@@ -609,7 +643,7 @@ class Clusters:
             transform=ccrs.PlateCarree(),  # the data's projection
             col="c",
             cmap=plt.cm.get_cmap('seismic', 31),
-            size=5,
+            size=5,vmin=-4, vmax=4, extend ='both',
             aspect=2,
             sharey=True,
             col_wrap=int(n_cols),  # multiplot settings
