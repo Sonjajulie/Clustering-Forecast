@@ -6,9 +6,22 @@
 # 5th argument is for bootstrap method.
 
 # variables in array:
-predictand=( prec_t TS )
+#predictand=( prec_t TS )
+#
+#for pred in "${predictand[@]}"
+#do
+#    sbatch --output=output_$pred.out --error=error_$pred.err --job-name=cl_$pred main_odyssey_forecast_nn.sh ${pred} 0 1980 standardized
+#done
+predictand=( TS )
+# precursors=(FSNO-America FSNO-Eurasia  ICEFRAC Z500 SST PSL)
+
+#~ precursors=(FSNO-America FSNO-Eurasia Z500 SST PSL)
+precursors=(Z500)
 
 for pred in "${predictand[@]}"
 do
-    sbatch --output=output_$pred.out --error=error_$pred.err --job-name=cl_$pred main_odyssey_forecast_nn.sh ${pred} 0 1980 standardized
+    for var in "${precursors[@]}"
+    do
+        sbatch --output=output_opt_${pred}_${var}.out --error=error_opt_${pred}_${var}.err --job-name=cl_opt_${pred}_${var} main_odyssey_forecast_nn.sh ${pred} ${var} 0 1980 standardized-opt
+    done
 done

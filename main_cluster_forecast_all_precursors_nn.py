@@ -76,7 +76,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
     # Calculate clusters of precursors for var, by removing one year
     predictand.calculate_clusters_from_test_data(y_train, forecast_nn.method_name, forecast_nn.k)
-    predictand.plot_composites(forecast_nn.k, 0.00001)
+    # ~ predictand.plot_composites(forecast_nn.k, 0.00001)
 
     # Calculate composites
     precursors.get_composites_data_1d_train_test(X_train, predictand.f, forecast_nn.k, forecast_nn.method_name,
@@ -108,7 +108,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
         for year in range(len(y_test[predictand.var])):  # len(y_test[predictand.var])):
             print(year)
-            forecast_temp =  forecast_nn.prediction_nn(forecast_nn.list_precursors_all, predictand.clusters,
+            forecast_temp =  forecast_nn.prediction_nn_model(forecast_nn.list_precursors_all, predictand.clusters,
                                                        precursors.dict_composites, X_test, year)
             # Assign forecast_nn data to array
             forecast_data[year] = forecast_temp
