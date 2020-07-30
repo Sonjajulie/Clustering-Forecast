@@ -6,6 +6,8 @@ Created on Tue Jan 10 15:19:19 2017
 """
 # import libraries
 import numpy as np
+import cartopy.feature as cfeature
+
 from classes.Precursors import Precursors
 from classes.Predictand import Predictand
 
@@ -60,12 +62,14 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     output_label = cl_parser.arguments['outputlabel']
     output_path = cl_parser.arguments['outputpath']
     data_range = cl_parser.arguments['datarange']
+    data_range = cl_parser.arguments['datarange']
     predictand = Predictand(inifile, output_path, output_label, cl_config)
     dict_skills_pattern = {}
 
     # load precursors
     precursors = Precursors(inifile, output_path, output_label, cl_config)
 
+    
     # load forecast_nn-parameters
     method_name = 'ward'
     k = 5
@@ -84,8 +88,9 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # Calculate clusters of precursors for var, by removing one year
     predictand.calculate_clusters_from_test_data(y_train, forecast_nn.method_name, forecast_nn.k)
     # Calculate composites
-    precursors.get_composites_data_1d_train_test(X_train, predictand.f, forecast_nn.k, forecast_nn.method_name,
+    precursors.get_composites_data_1d_train_test(X_train, X_test, predictand.f, forecast_nn.k, forecast_nn.method_name,
                                                  predictand.var)
+
     # precursors.plot_composites(k, 1)
     # subtract train mean also for test data
     # for prec in forecast_nn.list_precursors_all:
@@ -98,7 +103,9 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     #for forecast_predictands in forecast_nn.list_precursors_combinations:
     # Calculate forecast_nn for all years
     # ~ forecast_nn.list_precursors = forecast_predictands
-    forecast_nn.list_precursors = ["Z500"]
+    forecast_precursors = cl_parser.arguments['forecast_precursors']
+    logger.info(forecast_precursors)
+    forecast_nn.list_precursors = forecast_precursors
     list_methods = ["SGD","Adam"]
     forecast_predictands = forecast_nn.list_precursors
 
@@ -111,26 +118,26 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     len_alpha = len(alphas_train)
     # set the parameter space boundary
     p = {
-        # ~ 'lr': [0.1, 0.01, 0.001, 0.0001],
-        'lr': [0.1, 0.01, 0.001],
-        # ~ 'activation': ['relu', 'elu'],
+        # 'lr': [0.1, 0.01, 0.001, 0.0001],
+        'lr': [0.001],
+        # 'activation': ['relu', 'elu'],
         'activation': ['relu'],
         'kernel_initializer': ['random_uniform'],
-         # ~ 'optimizer': ['Nadam','Adam','SGD'],
-         'optimizer': ['Adam','SGD'],
+         # 'optimizer': ['Nadam','Adam','SGD'],
+         'optimizer': ['Adam'],
          'losses': ['logcosh'],
          'shapes': ['brick'],
          # ~ 'first_neuron': [5, 16, 32, 64, 128],
-         'first_neuron': [8, 16],
+         'first_neuron': [5],
         'forecast_predictands': forecast_nn.list_precursors,
         'len_alpha':[len_alpha],
          # ~ 'hidden_layers': [0, 1, 2, 3, 4, 5],
-         'hidden_layers': [1, 2, 3, 4, 5],
+         'hidden_layers': [2, 3],
          # ~ 'dropout': [.2, .3, .4],
-         'dropout': [.2, .3, .4, .5],
+         'dropout': [.2],
          # ~ 'batch_size': [5, 8, 16, 32, 64],
-         'batch_size': [8, 16, 32],
-         'epochs': [5],
+         'batch_size': [ 5],
+         'epochs': [50],
          'last_activation': ['linear'],
          'y_train': [y_train[predictand.var]],
          'x_test': [X_test],
