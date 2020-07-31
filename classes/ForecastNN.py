@@ -59,8 +59,9 @@ sns.set()
 
 def wrapper_function_cluster_corr(clusters_1d: np.array, observations: np.array, k: int, batch_size_in: int):
     """
-    This is a wrapper function for a loss function because keras only accepts loss-functions with two input-parameter.
-    Hence all other parameters must be set through this function (and then it magically works).
+    This is a wrapper function (decorater) for a loss function because keras only accepts loss-functions with two
+    input-parameter.
+    Hence all other parameters must be set through this function.
     :param clusters_1d: contain all k 1d clusters
     :param observations: contain all observational data
     :param k: number of clusters
@@ -97,8 +98,16 @@ def wrapper_function_cluster_corr(clusters_1d: np.array, observations: np.array,
                 y_pred_projection_beta = y_pred[i_batch_body, i]
                 pred = pred + y_pred_projection_beta * cluster_i
             pred_corr[i_batch_body] = pred
-            cl_loss_body = tf.add(cl_loss_body, K.mean(K.square(tf.squeeze(pred) - observations_year), axis=-1))
-            # tf.print("pred:", [tf.shape(pred), pred], output_stream=sys.stdout)
+            # cl_loss_body = tf.add(cl_loss_body, K.mean(K.square(tf.squeeze(pred) - observations_year), axis=-1))
+
+            # calculate taylor skill
+            cl_corr = tfp.stats.correlation(pred, observations_year, sample_axis=0, event_axis=None)
+            cl_std_obs = tfp.stats.stddev(observations_year)
+            cl_std_mod = tfp.stats.stddev(pred)
+            ax = cl_std_mod / cl_std_obs
+            cl_loss_body =  (4 * tf.pow((1 + cl_corr), 4)) / (16 * tf.pow((ax + 1 / ax), 2))
+
+            tf.print("pred:", [tf.shape(pred), pred], output_stream=sys.stdout)
             return [tf.add(i_batch_body, 1), batch_size_body, cl_loss_body]
 
         # if condition for tf.while_loop
@@ -112,10 +121,10 @@ def wrapper_function_cluster_corr(clusters_1d: np.array, observations: np.array,
         # call tf.while_loop according to the website:
         i_batch, batch_size, result = tf.while_loop(condition, body, [i_batch, batch_size, cl_loss])
 
-        # tf.print("result:", [tf.shape(result), result], output_stream=sys.stdout)
+        tf.print("result:", [tf.shape(result), result], output_stream=sys.stdout)
         # tf.truediv enforces python v3 division semantics
-        return 1.0 - tf.reduce_mean(tfp.stats.correlation(observations, pred_corr, sample_axis=0, event_axis=None))
-
+        #return 1.0 - tf.reduce_mean(tfp.stats.correlation(observations, pred_corr, sample_axis=0, event_axis=None))
+        return 1.0 - tf.reduce_mean(cl_loss)
 
 
 
@@ -508,7 +517,7 @@ class ForecastNN(Forecast):
         return self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo
 
     # noinspection PyPep8Naming
-    def train_nn_talos(self, X_train, y_train, X_val, y_val, params):
+    def train_nn_talos_old(self, X_train, y_train, X_val, y_val, params):
         """
         optimize forecast by using different parameters to train nn for forecast
         :param forecast_predictands: list contains predictands which should be used to forecast
@@ -724,7 +733,7 @@ class ForecastNN(Forecast):
 
             # ~ self.forecast_var += self.beta_all[i] * clusters_1d[int(i)]
             self.forecast_var += self.alpha_all[i] * clusters_1d[int(i)]
-        return self.forecast_var  
+        return self.forecast_var
 
     def calc_alphas_for_talos(self, X_train: dict, y_train: np.array, params):
         # Merge only those precursors which were selected
@@ -764,7 +773,7 @@ class ForecastNN(Forecast):
         # bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None)
 
         self.model_ta.add(Dense(params["first_neuron"], input_dim=self.k, activation=params['activation'],))  # kernel_initializer=params['kernel_initializer']
-        self.model_ta.add(Dropout(params['dropout']))
+        # self.model_ta.add(Dropout(params['dropout']))
         # if we want to also test for number of layers and shapes, that's possible
         # https://github.com/autonomio/talos/blob/master/examples/A%20Very%20Short%20Introduction%20to%20Hyperparameter%20Optimization%20of%20Keras%20Models%20with%20Talos.ipynb
         # https: // autonomio.github.io / docs_talos /  # models

@@ -74,8 +74,8 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     method_name = 'ward'
     k = 5
 
-    # unfortunately, I can not load the library as the beginning, because netcdf load function for xarray
-    # does not work then
+    # unfortunately, I can not load the library tensorflow and therefore the class ForecastNN
+    # as the beginning, because netcdf load function for xarray does not work then
     from classes.ForecastNN import ForecastNN
     forecast_nn = ForecastNN(inifile, output_path, output_label, cl_config, predictand.var, k, method_name)
     logger.info("Clusters: " + str(forecast_nn.k))
@@ -114,6 +114,10 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
         'forecast_predictands': forecast_nn.list_precursors,
         'clusters_1d': predictand.clusters,
     }
+
+    # calculate pseudo-values meaning that y contains at element 0 the time step for the correct forecast variable
+    # Cannot do it differently, because y-train values have to have to same dimension than the output, we would like to
+    # get (beta-values), comparison can done differently
     alphas_train, alphas_val, y_train_pseudo, y_val_pseudo = forecast_nn.calc_alphas_for_talos(X_train, y_train[predictand.var], dict_calc_X_y)
     len_alpha = len(alphas_train)
     # set the parameter space boundary
@@ -171,15 +175,6 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     #
     # # draws a histogram for 'val_acc'
     # print(r.plot_hist())
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
