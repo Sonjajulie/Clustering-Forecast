@@ -277,7 +277,7 @@ class Clusters:
         set directories for plots
         :param directory: directory for images
         """
-        # self.directory_plots = f"{self.output_path}/{directory}"
+        self.directory_plots = f"{self.output_path}/{directory}"
 
         Path(self.directory_plots).mkdir(parents=True, exist_ok=True)
         self.logger.info(f"self.directory_plots: {self.directory_plots}")
@@ -321,6 +321,7 @@ class Clusters:
                                                   (self.dict_predict[self.var].shape[1],
                                                    self.dict_predict[self.var].shape[2]))
 
+
     def _calculate_standardized_predictand(self, label: str):
         """
         calculate the standardized predictand
@@ -344,13 +345,13 @@ class Clusters:
         #     self.sigma_var = np.std(self.varAnom, axis=0)# np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
         #     self.sigma_var[self.sigma_var == 0] = 1
         #     self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var
-        if self.output_label == "standardized" or self.output_label == "standardized-opt" or self.output_label == "standardized-opt2":
+        if self.output_label == "not-standardized" or self.output_label == "not-standardized-opt":
+            self.dict_standardized_pred_1D[label] = self.varAnom
+        else:
             # self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
             self.sigma_var[label]  = np.std(self.varAnom.flatten('F'), axis=0)
             self.dict_standardized_pred_1D[label] = self.varAnom / self.sigma_var[label]
 
-        else:
-            self.dict_standardized_pred_1D[label] = self.varAnom
 
     def calculate_clusters(self, method_name, k):
         """

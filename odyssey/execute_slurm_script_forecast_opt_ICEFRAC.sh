@@ -11,5 +11,5 @@ predictand=( TS )
 
 for pred in "${predictand[@]}"
 do
-    sbatch --output=output_nn_sim_$pred.out --error=error_opt_$pred.err --job-name=cl_sim_nn_$pred main_odyssey_forecast_nn_sim_anneal.sh ${pred} 0 1980 standardized-opt
+    sbatch --output=output_opt_${pred}_ICEFRAC.out --error=error_opt_${pred}_ICEFRAC.err --job-name=cl_opt_$pred main_odyssey_forecast_opt_ICEFRAC.sh ${pred} 0 1980 standardized-opt
 done

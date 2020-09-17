@@ -46,20 +46,21 @@ class Precursors(Composites):
         logging.config.dictConfig(cl_config)
         self.logger = logging.getLogger(__name__)
 
-    def _calculate_standardized_precursors(self, label: str):
-        """
-        Calculate standardized composites by mean and standard deviation
-        :param label: name of variable. If one uses a cluster the variable name is the same for different
-        model initialization and therefore I renamed the variable name.
-        """
-        self.logger.info("Calculate Standardized values")
-        self.varmean = np.mean(self.dict_prec_1D_var[label], axis=0)
-        self.varAnom = self.dict_prec_1D_var[label] - self.varmean
-        if self.output_label == "standardized" or self.output_label == "standardized-opt":
-            self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
-            self.dict_standardized_precursors_var[label] = self.varAnom / self.sigma_var
-        else:
-            self.dict_standardized_precursors_var[label] = self.varAnom
+
+    # def _calculate_standardized_precursors(self, label: str):
+    #     """
+    #     Calculate standardized composites by mean and standard deviation
+    #     :param label: name of variable. If one uses a cluster the variable name is the same for different
+    #     model initialization and therefore I renamed the variable name.
+    #     """
+    #     self.logger.info("Calculate Standardized values!!!")
+    #     self.varmean = np.mean(self.dict_prec_1D_var[label], axis=0)
+    #     self.varAnom = self.dict_prec_1D_var[label] - self.varmean
+    #     if self.output_label == "standardized" or self.output_label == "standardized-opt":
+    #         self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+    #         self.dict_standardized_precursors_var[label] = self.varAnom / self.sigma_var
+    #     else:
+    #         self.dict_standardized_precursors_var[label] = self.varAnom
 
     def plot_composites_without_significance(self, k: int):
         """
@@ -173,10 +174,13 @@ class Precursors(Composites):
             self._remove_year(prec, year)
             self._create_composites(prec, f, k, method_name, predictand)
 
-    def get_composites_data_1d_train_test(self, train_data: dict, f: np.ndarray, k: int, method_name: str,
+
+    def get_composites_data_1d_train_test(self, train_data: dict, test_data: dict, f: np.ndarray, k: int,
+                                          method_name: str,
                                           predictand: str):
         """ calculate composites of standardized precursors
         :param train_data: list with data which we use for forecasting
+        :param test_data_data: list with data which we use for test forecasting. just for normalization
         :param f: np.ndarray containing the cluster number for each state
         :param k: number of clusters
         :param method_name: method for clustering
@@ -190,8 +194,7 @@ class Precursors(Composites):
         # go through all forecast_nn variables
         for prec in self.dict_standardized_precursors.keys():
             self.var = prec
-
-
+            self.dict_standardized_precursors[self.var] = train_data[self.var]
             # self._calculate_standardized_precursors(self.var)
             # {self.output_path}/
             self.directories_plots[self.var] = f"output-{self.output_label}/" \
@@ -202,6 +205,7 @@ class Precursors(Composites):
                                                f"/Composites/{self.var}/{method_name}_Composite_{k}/files/"
             Path(self.directories_files[self.var]).mkdir(parents=True, exist_ok=True)
             self._create_composites(prec, f, k, method_name, predictand)
+
 
     def _remove_year(self, prec: str, year=-1):
         """

@@ -16,12 +16,12 @@ predictand=( TS )
 # precursors=(FSNO-America FSNO-Eurasia  ICEFRAC Z500 SST PSL)
 
 #~ precursors=(FSNO-America FSNO-Eurasia Z500 SST PSL)
-precursors=(Z500)
+precursors=(ICEFRAC)
 
 for pred in "${predictand[@]}"
 do
     for var in "${precursors[@]}"
     do
-        sbatch --output=output_opt_${pred}_${var}.out --error=error_opt_${pred}_${var}.err --job-name=cl_opt_${pred}_${var} main_odyssey_forecast_nn.sh ${pred} ${var} 0 1980 standardized-opt
+        sbatch --output=output_opt_${pred}_nn_${var}.out --error=error_opt_nn_${pred}_${var}.err --job-name=cl_nn_opt_${pred}_${var} main_odyssey_forecast_nn.sh ${pred} ${var} 0 1980 standardized-opt
     done
 done

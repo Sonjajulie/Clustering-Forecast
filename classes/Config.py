@@ -48,13 +48,13 @@ class Config:
 
                 'classes.Composites': {  # if __name__ == 'classes.Composites'
                     'handlers': ['console','file'],
-                    'level': 'INFO', # at what level shall call begin (still different for the handler)
+                    'level': 'ERROR', # at what level shall call begin (still different for the handler)
                     'propagate': False
                 },
 
                 'classes.Precursors': {  # if __name__ == 'classes.Precursors'
                     'handlers': ['console', 'file'],
-                    'level': 'INFO',  # at what level shall call begin (still different for the handler)
+                    'level': 'ERROR',  # at what level shall call begin (still different for the handler)
                     'propagate': False
                 },
 

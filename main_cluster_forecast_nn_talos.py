@@ -120,10 +120,13 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # get (beta-values), comparison can done differently
     alphas_train, alphas_val, y_train_pseudo, y_val_pseudo = forecast_nn.calc_alphas_for_talos(X_train, y_train[predictand.var], dict_calc_X_y)
     len_alpha = len(alphas_train)
+
     # set the parameter space boundary
     p = {
-        # 'lr': [0.1, 0.01, 0.001, 0.0001],
-        'lr': [0.001],
+        # 'lr': [0.01],
+        'lr': [0.0001],
+        # 'lr': [0.01],
+        # 'lr': [0.001],
         # 'activation': ['relu', 'elu'],
         'activation': ['relu'],
         'kernel_initializer': ['random_uniform'],
@@ -131,26 +134,29 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
          'optimizer': ['Adam'],
          'losses': ['logcosh'],
          'shapes': ['brick'],
-         # ~ 'first_neuron': [5, 16, 32, 64, 128],
          'first_neuron': [5],
-        'forecast_predictands': forecast_nn.list_precursors,
+         # 'first_neuron': [5],
+        'forecast_predictands': [forecast_nn.list_precursors],
         'len_alpha':[len_alpha],
-         # ~ 'hidden_layers': [0, 1, 2, 3, 4, 5],
-         'hidden_layers': [2, 3],
-         # ~ 'dropout': [.2, .3, .4],
-         'dropout': [.2],
-         # ~ 'batch_size': [5, 8, 16, 32, 64],
-         'batch_size': [ 5],
-         'epochs': [50],
+         # 'hidden_layers': [2, 3],
+         'hidden_layers': [3],
+         'dropout': [.1],
+         # 'dropout': [.1],
+         'batch_size': [64],
+         # 'batch_size': [5],
+         'epochs': [95,105], # [800],
          'last_activation': ['linear'],
          'y_train': [y_train[predictand.var]],
          'x_test': [X_test],
          'y_test': [y_test[predictand.var]],
         'composites_1d': [precursors.dict_composites],
+        'precursor': [precursors.var],
          'pattern_corr': [1],
          'time_corr': [1],
+         'taylor_skill': [0],
+        #
     }
-
+    # logger.info(f' precursor: {p["precursor"]}')
     index_df = 0
     import talos as ta
     t = ta.Scan(x=alphas_train,

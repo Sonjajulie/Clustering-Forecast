@@ -20,13 +20,13 @@ from scipy import stats
 def lat_range(x):
     if (x[1] < 0 and x[0] > 0):
         return -1
-    return x[1] - x[0] - 10  # >=0
+    return x[1] - x[0] - 20  # >=0
 
 
 def lon_range(x):
     if (x[3] < 0 and x[2] > 0):
         return -1
-    return x[3] - x[2] - 10  # >=0
+    return x[3] - x[2] - 20  # >=0
 
 
 def train_test_split_pred(predictand, precursors, data_range, forecast_predictands: list, train_size=0.66,
@@ -108,7 +108,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
     # load forecast_nn-parameters
     method_name = 'ward'
-    k = 6
+    k = 5
     forecast = Forecast(inifile, cl_config, k, method_name)
     logger.info("Clusters: " + str(forecast.k))
 
@@ -159,7 +159,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
 
             ax = a_xm / a_xo
             corr = stats.pearsonr(y_test[f"{predictand.var}"][year], forecast_data[year])[0]
-            skills_score_predictor[year] = (4*(1 + corr)) / ( 2 * (ax + 1/ax)**2) # ((4*(1 + corr)**4) / ( 16 * (ax + 1/ax)**2))
+            skills_score_predictor[year] =  (4*(1 + corr)) / ( 2 * (ax + 1/ax)**2) # ((4*(1 + corr)**4) / ( 16 * (ax + 1/ax)**2))
             ax_predictor[year] = ax
             corr_predictor[year] = corr
             # logger.info(
@@ -200,10 +200,10 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     cons = ({'type': 'ineq', 'fun': lat_range},
             {'type': 'ineq', 'fun': lon_range},)
     var = forecast_precursors[0]
-    bounds = [(precursors.lat_min[var], precursors.lat_max[var] - 10),
-              (precursors.lat_min[var] + 10, precursors.lat_max[var]),
-              (precursors.lon_min[var], precursors.lon_max[var] - 10),
-              (precursors.lon_min[var] + 10, precursors.lon_max[var])]
+    bounds = [(precursors.lat_min[var], precursors.lat_max[var] - 20),
+              (precursors.lat_min[var] + 20, precursors.lat_max[var]),
+              (precursors.lon_min[var], precursors.lon_max[var] - 20),
+              (precursors.lon_min[var] + 20, precursors.lon_max[var])]
     # ~ res = shgo(skill, bounds, args=({'Nfeval':0},), iters=10, constraints=cons)
     # res = dual_annealing(skill, bounds, args=({'Nfeval': 0, 'best_values': 0},), maxiter=5000)
     # 2020-07-18 19:12:16,756 - __main__ - INFO - 27.500000 82.500000 43.750000 316.250000 0.29794461371540987 0.17793906843190135 261

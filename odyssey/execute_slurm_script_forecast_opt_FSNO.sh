@@ -8,8 +8,15 @@
 # variables in array:
 # predictand=( prec_t TS )
 predictand=( TS )
+# precursors=(FSNO-America FSNO-Eurasia  ICEFRAC Z500 SST PSL)
+
+precursors=(FSNO-America FSNO-Eurasia)
+#precursors=(SST)
 
 for pred in "${predictand[@]}"
 do
-    sbatch --output=output_nn_sim_$pred.out --error=error_opt_$pred.err --job-name=cl_sim_nn_$pred main_odyssey_forecast_nn_sim_anneal.sh ${pred} 0 1980 standardized-opt
+    for var in "${precursors[@]}"
+    do
+        sbatch --output=output_opt_${pred}_${var}.out --error=error_opt_${pred}_${var}.err --job-name=cl_opt_$pred main_odyssey_forecast_opt_FSNO.sh ${pred} ${var} 0 1980 standardized-opt
+    done
 done

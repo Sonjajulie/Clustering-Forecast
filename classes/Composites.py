@@ -97,6 +97,7 @@ class Composites:
 
                 self.dict_precursors_var[self.var] = xr.open_dataset(self.config[prec]["filepath"])[
                     self.config[prec]["var"]]
+
                 self._set_area_composite(self.var, prec)
                 if self.config.has_option(prec, "mask"):
                     self._get_and_apply_mask(self.config[prec]["name"], prec)
@@ -138,6 +139,7 @@ class Composites:
                     self.logger.debug(f"file {file}: {self.list_of_files[file]}")
                     self.dict_precursors_var[f"{self.var}_{file}"] = \
                         xr.open_dataset(self.list_of_files[file])[self.config[prec]["var"]]
+
                     self._set_area_composite(f"{self.var}_{file}", prec)
                     if self.config.has_option(prec, "mask"):
                         self._get_and_apply_mask(f"{self.var}_{file}", prec)
@@ -243,6 +245,8 @@ class Composites:
                 self.cut_area[self.var] = False
         else:
             raise ValueError("Spatial attribute (e.g. latitude and longitude) not found!")
+
+
 
     def set_area_composite_opt(self, var: str, cut_array: list):
         """
@@ -364,21 +368,26 @@ class Composites:
         :param label: name of variable. If one uses a cluster the variable name is the same for different
         model initialization and therefore I renamed the variable name.
         """
-        self.logger.info("Calculate Standardized values")
+        self.logger.info("Calculate Standardized values!")
         self.varmean = np.mean(self.dict_prec_1D_var[label], axis=0)
         # self.varmean = np.nanmean(self.dict_prec_1D_var[label].flatten('F'), axis=0)
         self.varAnom = self.dict_prec_1D_var[label] - self.varmean
 
+
         # if self.output_label == "standardized" or self.output_label == "standardized-opt":
-        #     self.sigma_var = np.std(self.varAnom, axis=0)# np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
-        #     self.sigma_var[self.sigma_var == 0] = 1
+        #     # self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
+        #     self.sigma_var = np.std(self.varAnom.flatten('F'), axis=0)
         #     self.dict_standardized_precursors_var[label] = self.varAnom / self.sigma_var
-        if self.output_label == "standardized" or self.output_label == "standardized-opt":
+        # else:
+        #     self.dict_standardized_precursors_var[label] = self.varAnom
+
+        if self.output_label == "not-standardized" or self.output_label == "not-standardized-opt":
+            self.dict_standardized_precursors_var[label] = self.varAnom
+        else:
             # self.sigma_var = np.sum(self.varAnom * self.varAnom) / (self.varAnom.shape[0] * self.varAnom.shape[1])
             self.sigma_var = np.std(self.varAnom.flatten('F'), axis=0)
             self.dict_standardized_precursors_var[label] = self.varAnom / self.sigma_var
-        else:
-            self.dict_standardized_precursors_var[label] = self.varAnom
+
 
     def _create_composites(self, key: str, f: np.ndarray, k: int, method_name: str, predictand: str):
         """

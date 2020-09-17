@@ -57,83 +57,7 @@ import matplotlib.ticker as mticker
 sns.set()
 
 
-def wrapper_function_cluster_corr(clusters_1d: np.array, observations: np.array, k: int, batch_size_in: int):
-    """
-    This is a wrapper function (decorater) for a loss function because keras only accepts loss-functions with two
-    input-parameter.
-    Hence all other parameters must be set through this function.
-    :param clusters_1d: contain all k 1d clusters
-    :param observations: contain all observational data
-    :param k: number of clusters
-    :param batch_size_in: size of batches, normally 32
-    Problem is that keras accept only functions that have y_pred and y_true as arguments
-    """
-
-    def loss(y_true, y_pred):
-        """
-        define own loss function in order to get the correct projection coefficients of our predictand. In this case
-        we calculate the mean square error function of the output
-        :param y_pred: forecast calculated with the betas, which we get from the NN as input()
-        :param y_true: This is a k-len vector with the first index showing the number for the observational data
-        """
-
-        # seems like that first time this function is called y_true is None, there for this workaround
-        batch_size = tf.shape(y_true)[0]
-        if batch_size is None:
-            batch_size = tf.constant(batch_size_in, dtype=np.int32)
-        pred_corr = tf.zeros(shape=tf.shape(observations), dtype="float32")
-        # body for tf.while_loop
-        def body(i_batch_body, batch_size_body, cl_loss_body):
-            # to cast from tf.float32 to tf.int32
-            index = tf.dtypes.cast(y_true[i_batch_body, 0], tf.int32)
-            # get observation for certain year and index of batch
-            observations_year = tf.convert_to_tensor(observations, np.float32)[index]
-            # create tensorflow array with dimension of len(observations_year)
-            pred = tf.zeros(shape=tf.shape(observations_year), dtype="float32")
-            clusters_1d_tf = tf.convert_to_tensor(clusters_1d, np.float32)
-
-            # go through for-loop and add y_pred to tensorflow array
-            for i in range(int(k)):
-                cluster_i = tf.gather(clusters_1d_tf, i)
-                y_pred_projection_beta = y_pred[i_batch_body, i]
-                pred = pred + y_pred_projection_beta * cluster_i
-            pred_corr[i_batch_body] = pred
-            # cl_loss_body = tf.add(cl_loss_body, K.mean(K.square(tf.squeeze(pred) - observations_year), axis=-1))
-
-            # calculate taylor skill
-            cl_corr = tfp.stats.correlation(pred, observations_year, sample_axis=0, event_axis=None)
-            cl_std_obs = tfp.stats.stddev(observations_year)
-            cl_std_mod = tfp.stats.stddev(pred)
-            ax = cl_std_mod / cl_std_obs
-            cl_loss_body =  (4 * tf.pow((1 + cl_corr), 4)) / (16 * tf.pow((ax + 1 / ax), 2))
-
-            tf.print("pred:", [tf.shape(pred), pred], output_stream=sys.stdout)
-            return [tf.add(i_batch_body, 1), batch_size_body, cl_loss_body]
-
-        # if condition for tf.while_loop
-        # noinspection PyUnusedLocal
-        def condition(i_batch_condition, batch_size_condition, cl_loss_condition):
-            return tf.less(i_batch_condition, batch_size_condition)
-
-        # initialize of tf.while_loop parameters
-        cl_loss = tf.constant(0.)
-        i_batch = tf.constant(0, dtype=np.int32)
-        # call tf.while_loop according to the website:
-        i_batch, batch_size, result = tf.while_loop(condition, body, [i_batch, batch_size, cl_loss])
-
-        tf.print("result:", [tf.shape(result), result], output_stream=sys.stdout)
-        # tf.truediv enforces python v3 division semantics
-        #return 1.0 - tf.reduce_mean(tfp.stats.correlation(observations, pred_corr, sample_axis=0, event_axis=None))
-        return 1.0 - tf.reduce_mean(cl_loss)
-
-
-
-    return loss
-
-
-
-
-def wrapper_function_cluster_corr(clusters_1d: np.array, observations: np.array, k: int, batch_size_in: int):
+def wrapper_function_cluster_taylor(clusters_1d: np.array, observations: np.array, k: int, batch_size_in: int):
     """
     This is a wrapper function for a loss function because keras only accepts loss-functions with two input-parameter.
     Hence all other parameters must be set through this function (and then it magically works).
@@ -171,22 +95,30 @@ def wrapper_function_cluster_corr(clusters_1d: np.array, observations: np.array,
             clusters_1d_tf = tf.convert_to_tensor(clusters_1d, np.float32)
 
             # go through for-loop and add y_pred to tensorflow array
-
             for i in range(int(k)):
                 cluster_i = tf.gather(clusters_1d_tf, i)
-                y_pred_projection_beta = y_pred[i_batch_body, i]
+                y_pred_projection_beta = 1 + y_pred[i_batch_body, i]
+                # tf.print("y_pred_projection_beta:", [tf.shape(y_pred_projection_beta), y_pred_projection_beta],
+                #          output_stream=sys.stdout)
                 pred = pred + y_pred_projection_beta * cluster_i
 
-            #     # ~ cl_rmse_body = tf.add(cl_rmse_body, K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)))
-            # cl_rmse_body = tf.add(cl_rmse_body, K.sqrt(K.mean(K.square(pred - observations_year), axis=-1)))
-            # # tf.print("pred:", [tf.shape(pred), pred], output_stream=sys.stdout)
-            # return [tf.add(i_batch_body, 1), batch_size_body, cl_rmse_body]
 
-            my_corr = tfp.stats.correlation(pred, observations_year, sample_axis=0, event_axis=None)
-            corr = tf.cond(tf.math.is_finite(my_corr), lambda: 1 - my_corr, lambda: 2.)
+            # calculate taylor skill
+            cl_corr = tfp.stats.correlation(pred, observations_year, sample_axis=0, event_axis=None)
+            cl_std_obs = tfp.stats.stddev(observations_year)
+            cl_std_mod = tfp.stats.stddev(pred)
+            ax = cl_std_mod / cl_std_obs
+            # tf.print("cl_std_obs:", [tf.shape(cl_std_obs), cl_std_obs],output_stream=sys.stdout)
+            # tf.print("cl_std_mod:", [tf.shape(cl_std_mod), cl_std_mod],output_stream=sys.stdout)
+            # tf.print("cl_corr:", [tf.shape(cl_corr), cl_corr],output_stream=sys.stdout)
+            cl_taylor =  (4 * tf.pow((1 + cl_corr), 4)) / (16 * tf.pow((ax + 1 / ax), 2))
+            # tf.print("cl_taylor:", [tf.shape(cl_taylor), cl_taylor],output_stream=sys.stdout)
 
-            pred_corr_body = tf.cond( tf.math.equal(i_batch_body, 0) , lambda:  tf.expand_dims(pred, 0), lambda: tf.concat([pred_corr_body, tf.expand_dims(pred, 0)], axis=0))
+            corr = tf.cond(tf.math.is_finite(cl_taylor), lambda: 1 - cl_taylor, lambda: 1.)
+
+            # pred_corr_body = tf.cond( tf.math.equal(i_batch_body, 0) , lambda:  tf.expand_dims(pred, 0), lambda: tf.concat([pred_corr_body, tf.expand_dims(pred, 0)], axis=0))
             cl_loss_body = tf.add(cl_loss_body, corr)
+            # tf.print("cl_loss_body:", [tf.shape(cl_loss_body), cl_loss_body], output_stream=sys.stdout)
             return [tf.add(i_batch_body, 1), batch_size_body, cl_loss_body, pred_corr_body, obs_corr_body]
 
 
@@ -207,71 +139,13 @@ def wrapper_function_cluster_corr(clusters_1d: np.array, observations: np.array,
                                                                                                   tf.TensorShape(None), tf.TensorShape(None)] # pred_corr.get_shape()
                                                                                )
 
-        corr = tfp.stats.correlation(obs_corr, pred_corr, sample_axis=0, event_axis=None)
-        corr1d = tf.identity(tf.reshape(corr, [-1]))
+        # corr = tfp.stats.correlation(obs_corr, pred_corr, sample_axis=0, event_axis=None)
+        # corr1d = tf.identity(tf.reshape(corr, [-1]))
         return tf.truediv(result, tf.dtypes.cast(batch_size, tf.float32))
     return loss
 
 
-def wrapper_function_cluster_loss(clusters_1d: np.array, observations: np.array, k: int, batch_size_in: int):
-    """
-    This is a wrapper function for a loss function because keras only accepts loss-functions with two input-parameter.
-    Hence all other parameters must be set through this function (and then it magically works).
-    :param clusters_1d: contain all k 1d clusters
-    :param observations: contain all observational data
-    :param k: number of clusters
-    :param batch_size_in: size of batches, normally 32
-    Problem is that keras accept only functions that have y_pred and y_true as arguments
-    """
 
-    def loss(y_true, y_pred):
-        """
-        define own loss function in order to get the correct projection coefficients of our predictand. In this case
-        we calculate the mean square error function of the output
-        :param y_pred: forecast calculated with the betas, which we get from the NN as input()
-        :param y_true: This is a k-len vector with the first index showing the number for the observational data
-        """
-
-        # seems like that first time this function is called y_true is None, there for this workaround
-        batch_size = tf.shape(y_true)[0]
-        if batch_size is None:
-            batch_size = tf.constant(batch_size_in, dtype=np.int32)
-
-        # body for tf.while_loop
-        def body(i_batch_body, batch_size_body, cl_loss_body):
-            # to cast from tf.float32 to tf.int32
-            index = tf.dtypes.cast(y_true[i_batch_body, 0], tf.int32)
-            # get observation for certain year and index of batch
-            observations_year = tf.convert_to_tensor(observations, np.float32)[index]
-            # create tensorflow array with dimension of len(observations_year)
-            pred = tf.zeros(shape=tf.shape(observations_year), dtype="float32")
-            clusters_1d_tf = tf.convert_to_tensor(clusters_1d, np.float32)
-
-            # go through for-loop and add y_pred to tensorflow array
-            for i in range(int(k)):
-                cluster_i = tf.gather(clusters_1d_tf, i)
-                y_pred_projection_beta = y_pred[i_batch_body, i]
-                pred = pred + y_pred_projection_beta * cluster_i
-            cl_loss_body = tf.add(cl_loss_body, K.mean(K.square(tf.squeeze(pred) - observations_year), axis=-1))
-            # tf.print("pred:", [tf.shape(pred), pred], output_stream=sys.stdout)
-            return [tf.add(i_batch_body, 1), batch_size_body, cl_loss_body]
-
-        # if condition for tf.while_loop
-        # noinspection PyUnusedLocal
-        def condition(i_batch_condition, batch_size_condition, cl_loss_condition):
-            return tf.less(i_batch_condition, batch_size_condition)
-
-        # initialize of tf.while_loop parameters
-        cl_loss = tf.constant(0.)
-        i_batch = tf.constant(0, dtype=np.int32)
-        # call tf.while_loop according to the website:
-        i_batch, batch_size, result = tf.while_loop(condition, body, [i_batch, batch_size, cl_loss])
-
-        # tf.print("result:", [tf.shape(result), result], output_stream=sys.stdout)
-        # tf.truediv enforces python v3 division semantics
-        return tf.truediv(result, tf.dtypes.cast(batch_size, tf.float32))
-
-    return loss
 
 
 class ForecastNN(Forecast):
@@ -345,524 +219,6 @@ class ForecastNN(Forecast):
         return np.asarray(alphas_train, dtype=np.float32), np.asarray(alphas_val, dtype=np.float32), \
                np.asarray(y_train_pseudo, dtype=np.float32), np.asarray(y_val_pseudo, dtype=np.float32)
 
-
-    # noinspection PyPep8Naming
-    def train_nn_opt(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, X_train: dict,
-                     y_train: np.array, nr_neurons: int, opt_method: str, nr_epochs: int, nr_layers: int,
-                     lr_rate: np.float,
-                     nr_batch_size: int):
-        """
-        optimize forecast by using different parameters to train nn for forecast
-        :param forecast_predictands: list contains predictands which should be used to forecast
-        :param clusters_1d: dict of all k-clusters
-        :param composites_1d: dict of composites with time and one-dimensional array
-        :param X_train: np.ndarray with all  data of precursors
-        :param y_train: np.ndarray with all  data of predictands
-        :param nr_neurons: number of neurons in each layer
-        :param opt_method: optimization method
-        :param nr_epochs: number of epochs
-        :param nr_layers: number of layers
-        :param lr_rate: learning rate
-        """
-        # Merge only those precursors which were selected
-        self.selected_composites_1D = np.hstack([composites_1d[i] for i in forecast_predictands])
-        self.selected_data_1d = np.hstack([X_train[i] for i in forecast_predictands])
-        self.clusters_1d = clusters_1d
-
-        # Calculate projection coefficients for all points in training set
-        self.len_selected_data = len(self.selected_data_1d)
-        self.alpha_all_years = np.zeros((self.len_selected_data, self.k))
-        self.alpha_matrix = np.zeros((self.k, self.k))
-        for year in range(self.len_selected_data):
-            self.alpha_all_years[year] = self._projection_coefficients_year(year)
-
-        self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo = \
-            self.train_test_split_nn(self.k, self.alpha_all_years, y_train)
-        self.logger.info('Create network (model): specify number of neurons in each layer:')
-        self.nr_neurons = nr_neurons  # self.k
-        np.random.seed(3456)
-        print(self.k)
-        self.model = Sequential()  # kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None),
-        # bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None)
-        self.model.add(Dense(self.nr_neurons, input_dim=len(self.alphas_train[0]), activation='relu', ))
-        for _ in range(nr_layers):
-            self.model.add(Dense(self.nr_neurons, activation='relu', kernel_regularizer=regularizers.l2(0.01)))
-        self.model.add(Dense(self.k, activation='linear'))
-
-        wr_cl_loss = wrapper_function_cluster_loss(np.asarray(self.clusters_1d), np.asarray(y_train), self.k,
-                                                   nr_batch_size)
-        self.dict_optimizer = {"Adam": optimizers.Adam(), "SGD": optimizers.SGD(), "Adamax": optimizers.Adamax(),
-                               "Nadam": optimizers.Nadam(),}
-        sgd = optimizers.SGD(lr=lr_rate, decay=1e-6, momentum=0.9, nesterov=True)
-
-        self.model.compile(
-
-            # ~ loss=wr_cl_loss, optimizer=self.dict_optimizer[opt_method],metrics=['mean_squared_error'])
-            # loss=wr_cl_loss, optimizer=sgd, metrics=['mean_squared_error'])
-
-            loss=wr_cl_loss, optimizer=self.dict_optimizer[opt_method],metrics=['mean_squared_error'])
-
-        # Check the sizes of all newly created datasets
-        logging.debug("Shape of x_train:", self.alphas_train.shape)
-        logging.debug("Shape of x_val:", self.alphas_val.shape)
-        logging.debug("Shape of y_train_pseudo:", self.y_train_pseudo.shape)
-        logging.debug("Shape of y_val_pseudo:", self.y_val_pseudo.shape)
-
-        logging.info('Train (fit) the network...')
-        # filepath = f"ModelWeights-{self.nr_neurons}.hdf5"
-        # checkpoint = ModelCheckpoint(filepath, save_best_only=True,
-        #                              monitor="val_mean_squared_error")
-
-        # ,callbacks = [checkpoint]
-
-        out = self.model.fit(self.alphas_train, self.y_train_pseudo,
-                             validation_data=(self.alphas_val, self.y_val_pseudo), epochs=nr_epochs,
-                             batch_size=self.batch_size, verbose=0)  #
-        # , epochs=500, batch_size=30, verbose=0, callbacks=[mcp]verbose=0)
-
-        # Saves the entire model into a file named as  'dnn_model.h5'
-        # {self.output_path}/
-        file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var}-{str(len(forecast_predictands))}-precursor/model/'
-        Path(file_path).mkdir(parents=True, exist_ok=True)
-        self.model.save(f'{file_path}/dnn_model-{self.nr_neurons}_{self.k}_cluster_{forecast_predictands}.h5')
-        self.logger.info('initial loss=' + repr(out.history["loss"][1]) + ', final=' + repr(out.history["loss"][-1]))
-        self.logger.info(repr(out))
-
-        file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var} - {str(len(forecast_predictands))}-precursor/progress/'
-        Path(file_path).mkdir(parents=True, exist_ok=True)
-
-        file_path = f'output-{self.output_label}/' \
-                    f'{self.var}-{str(len(forecast_predictands))}-precursor/progress/'
-        Path(file_path).mkdir(parents=True, exist_ok=True)
-        # plot progress of optimization
-        if 1:
-            fig, axs = plt.subplots(3, figsize=(12, 18))
-            # plt.figure(1, figsize=(12, 6));
-            # fig.suptitle("Model's Training & Validation process across epochs")
-            # axs[0].set_title("Model's Training & Validation across epochs")
-            axs[0].legend(['log(loss)'])
-            axs[0].semilogy(out.history["loss"][:])
-            axs[0].semilogy(out.history["val_loss"][:])
-            axs[0].legend(['Train', 'Validation'], loc='upper right')
-            axs[0].set(ylabel='$\log_{10}$(loss)')
-
-            axs[1].plot(self.model.history.history['loss'])
-            axs[1].plot(self.model.history.history['val_loss'])
-            # axs[1].set_title("Model's Training & Validation mean squared error across epochs")
-            axs[1].set(ylabel='Loss')
-            axs[1].legend(['Train', 'Validation'], loc='upper right')
-
-            axs[2].plot(self.model.history.history['mean_squared_error'])
-            axs[2].plot(self.model.history.history['val_mean_squared_error'])
-            # axs[2].set_title("Model's Training & Validation mean squared error across epochs")
-            axs[2].set(xlabel='Epochs', ylabel='mean squared diff between alphas & betas')
-            axs[2].legend(['Train', 'Validation'], loc='upper right')
-            plt.savefig(f"{file_path}/progress_wr_cl_loss_{self.nr_neurons}_neurons_{self.k}_cluster_"
-                        f"{forecast_predictands}.pdf", bbox_inches='tight')
-            plt.close('all')
-
-
-    def prediction_nn_model(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict,
-                            data_year_1d: dict,
-                            year: int):
-        """make forecast_nn
-        :param forecast_predictands: list contains predictands which should be used to forecast
-        :param clusters_1d: dict of all k-clusters
-        :param composites_1d: dict of composites with time and one-dimensional array
-        :param data_year_1d: np.ndarray with all  data of precursors
-        :param year: year which should be forecasted
-        """
-        # Merge only those precursors which were selected
-        self.selected_composites_1D = np.hstack([composites_1d[i] for i in forecast_predictands])
-        self.selected_data_1d = np.hstack([data_year_1d[i] for i in forecast_predictands])
-
-        # need those additional brackets, because it can be multiple input data and the outer brackets indicate the
-        # the length of the input data
-        self.alpha_all = np.asarray([self._projection_coefficients_year(year)])
-
-        # Calculate projection coefficients
-        self.beta_all = np.zeros(self.k)
-        self.beta_all = self.model.predict(self.alpha_all)[0]
-
-        self.alpha_all = np.asarray(self._projection_coefficients_year(year))
-
-        self.forecast_var = np.zeros(len(clusters_1d[0]))
-        for i in range(int(self.k)):
-            # ~ self.forecast_var += self.beta_all[i] * clusters_1d[int(i)]
-            self.forecast_var += self.alpha_all[i] * clusters_1d[int(i)]
-        return self.forecast_var
-
-    def calc_alphas_for_talos(self, X_train: dict, y_train: np.array, params):
-        # Merge only those precursors which were selected
-        self.selected_composites_1D = np.hstack([params["composites_1d"][i] for i in params["forecast_predictands"]])
-        self.selected_data_1d = np.hstack([X_train[i] for i in params["forecast_predictands"]])
-        self.clusters_1d = params["clusters_1d"]
-        self.shape1_pred = params['pred-shape1']
-        self.shape2_pred = params['pred-shape2']
-        self.ex = params['ex']
-        self.predictand = params['predictand']
-        self.count = 0
-
-        # Calculate projection coefficients for all points in training set
-        self.len_selected_data = len(self.selected_data_1d)
-        self.alpha_all_years = np.zeros((self.len_selected_data, self.k))
-        self.alpha_matrix = np.zeros((self.k, self.k))
-        for year in range(self.len_selected_data):
-            self.alpha_all_years[year] = self._projection_coefficients_year(year)
-
-        self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo = \
-            self.train_test_split_nn(self.k, self.alpha_all_years, y_train)
-        return self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo
-
-    # noinspection PyPep8Naming
-    def train_nn_talos_old(self, X_train, y_train, X_val, y_val, params):
-        """
-        optimize forecast by using different parameters to train nn for forecast
-        :param forecast_predictands: list contains predictands which should be used to forecast
-        :param X_train: np.ndarray with all  data of precursors
-        :param y_train: np.ndarray with all  data of predictands
-        :param params: dictionary of all tunable hyper parameters
-        """
-        self.alphas_train = X_train
-        self.alphas_val = X_val
-        self.y_train_pseudo = y_train
-        self.y_val_pseudo = y_val
-
-        self.logger.info('Create network (model): specify number of neurons in each layer:')
-        np.random.seed(3456)
-
-        self.model_ta = Sequential()  # kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None),
-        # bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None)
-
-        self.model_ta.add(Dense(params["first_neuron"], input_dim=self.k,activation=params['activation'],
-                                kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None),
-                                bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None)))
-        # kernel_initializer=params['kernel_initializer']
-        # self.model_ta.add(Dropout(params['dropout']))
-        # if we want to also test for number of layers and shapes, that's possible
-        # https://github.com/autonomio/talos/blob/master/examples/A%20Very%20Short%20Introduction%20to%20Hyperparameter%20Optimization%20of%20Keras%20Models%20with%20Talos.ipynb
-        # https: // autonomio.github.io / docs_talos /  # models
-        # https: // github.com / autonomio / talos / blob / master / talos / model / hidden_layers.py
-        # https://alphascientist.com/hyperparameter_optimization_with_talos.html
-        for i in range(params['hidden_layers']):
-            print(f"adding layer {i + 1}")
-            self.model_ta.add(Dense(params["first_neuron"], activation=params['activation'],
-                                kernel_initializer=tf.keras.initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None),
-                                bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None))) # input_dim=len(self.alphas_train[0]), , kernel_initializer=params['kernel_initializer']
-            # self.model_ta.add(Dropout(params['dropout']))
-        self.model_ta.add(
-            Dense(self.k, activation=params['last_activation'])) # , kernel_initializer=params['kernel_initializer']
-
-        # wr_cl_loss = wrapper_function_cluster_loss(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
-        # params['batch_size'])
-
-        wr_cl_loss = wrapper_function_cluster_corr(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
-                                                   params['batch_size'])
-
-        # self.model_ta.compile(
-        #     loss=wr_cl_loss, optimizer=params['optimizer'],
-        #     metrics=['mean_squared_error'])
-
-        self.model_ta.compile(
-            loss=wr_cl_loss, optimizer=params['optimizer'])
-
-        # noinspection PyAttributeOutsideInit
-        self.history = self.model_ta.fit(np.array(self.alphas_train), np.array(self.y_train_pseudo),
-                                         epochs=params['epochs'],
-                                         batch_size=params['batch_size'],
-                                         verbose=0)  # validation_data=(self.alphas_val, self.y_val_pseudo),
-
-        # Saves the entire model into a file named as  'dnn_model.h5'
-        file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var}-{str(len(params["forecast_predictands"]))}-precursor/model/'
-        Path(file_path).mkdir(parents=True, exist_ok=True)
-        self.model_ta.save(
-            f'{file_path}/dnn_model-{self.nr_neurons}_{self.k}_cluster_{params["forecast_predictands"]}.h5')
-        # self.logger.info('initial loss=' + repr(self.history.history["loss"][1]) + ', final=' + repr(
-        #     self.history.history["loss"][-1]))
-        # self.logger.info(repr(self.history))
-
-        file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var}-{str(len([params["forecast_predictands"]]))}-precursor/progress/'
-        Path(file_path).mkdir(parents=True, exist_ok=True)
-
-        # test data
-        # Calculate forecast_nn for all years
-        pattern_corr_values = []
-
-        # Prediction
-        # self.x_test = np.hstack([params["x_test"][i] for i in self.list_precursors_all])
-        forecast_data = np.zeros((len(params["y_test"]),
-                                  len(params["y_test"][1])))
-        for year in range(len(params["y_test"])):  # len(y_test[predictand.var])):
-            # print(year)
-            forecast_temp = self.prediction_nn(self.list_precursors_all, self.clusters_1d,
-                                               params["composites_1d"], params["x_test"], year)
-            # Assign forecast_nn data to array
-            forecast_data[year] = forecast_temp
-
-            # Calculate pattern correlation
-            pattern_corr_values.append(
-                stats.pearsonr(forecast_temp, params["y_test"][year])[0])
-
-            # Calculate time correlation for each point
-        time_correlation, significance = self.calculate_time_correlation_all_times(
-            np.array(params["y_test"]), forecast_data)
-        params["time_corr"] = np.nanmean(time_correlation)
-        params["pattern_corr"] = np.nanmean(pattern_corr_values)
-
-
-        # Reshape correlation maps
-        pred_t_corr_reshape = np.reshape(time_correlation, (self.shape1_pred, self.shape2_pred))
-        significance_corr_reshape = np.reshape(significance, (self.shape1_pred, self.shape2_pred))
-        self.ex.save_plot_and_time_correlation(self.list_precursors, self.predictand, pred_t_corr_reshape,
-                                              significance_corr_reshape, self.list_precursors_all, params["time_corr"], str(self.count))
-        print(params["time_corr"])
-        print(params["pattern_corr"])
-        self.count += 1
-        df_parameters_opt = pd.DataFrame({
-            "time_corr": np.nanmean(time_correlation), "pattern_corr": np.nanmean(pattern_corr_values),
-            "lr": params["lr"],
-            "activation": "relu",
-            "kernel_initializer": "random_uniform",
-            "optimizer": params['optimizer'],
-            "epochs": params['epochs'],
-            "losses": "logcos",
-            "shapes": "brick",
-            'first_neuron': params['first_neuron'],
-            'forecast_predictands': self.list_precursors,
-            'hidden_layers': params["hidden_layers"],
-            # 'dropout': params["dropout"],
-            'batch_size': params["batch_size"],
-
-        }, index=[self.index_df])
-        filename = f'{file_path}/skill_correlation-{self.var}-opt.csv'
-        with open(filename, 'a') as f:
-            df_parameters_opt.to_csv(f, header=f.tell() == 0)
-            self.index_df += 1
-        del df_parameters_opt
-        return self.history, self.model_ta
-        file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var} - {str(len(forecast_predictands))}-precursor/progress/'
-        Path(file_path).mkdir(parents=True, exist_ok=True)
-
-        # file_path = f'output-{self.output_label}/' \
-        #             f'{self.var}-{str(len(forecast_predictands))}-precursor/progress/'
-        # Path(file_path).mkdir(parents=True, exist_ok=True)
-        # plot progress of optimization
-        if 1:
-            fig, axs = plt.subplots(3, figsize=(12, 18))
-            # plt.figure(1, figsize=(12, 6));
-            # fig.suptitle("Model's Training & Validation process across epochs")
-            # axs[0].set_title("Model's Training & Validation across epochs")
-            axs[0].legend(['log(loss)'])
-            axs[0].semilogy(out.history["loss"][:])
-            axs[0].semilogy(out.history["val_loss"][:])
-            axs[0].legend(['Train', 'Validation'], loc='upper right')
-            axs[0].set(ylabel='$\log_{10}$(loss)')
-
-            axs[1].plot(self.model.history.history['loss'])
-            axs[1].plot(self.model.history.history['val_loss'])
-            # axs[1].set_title("Model's Training & Validation mean squared error across epochs")
-            axs[1].set(ylabel='Loss')
-            axs[1].legend(['Train', 'Validation'], loc='upper right')
-
-            axs[2].plot(self.model.history.history['mean_squared_error'])
-            axs[2].plot(self.model.history.history['val_mean_squared_error'])
-            # axs[2].set_title("Model's Training & Validation mean squared error across epochs")
-            axs[2].set(xlabel='Epochs', ylabel='mean squared diff between alphas & betas')
-            axs[2].legend(['Train', 'Validation'], loc='upper right')
-            plt.savefig(f"{file_path}/progress_wr_cl_loss_{self.nr_neurons}_neurons_{self.k}_cluster_"
-                        f"{forecast_predictands}.pdf", bbox_inches='tight')
-            plt.close('all')
-
-         
-         
-    def prediction_nn_model(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, data_year_1d: dict,
-                      year: int):
-        """make forecast_nn
-        :param forecast_predictands: list contains predictands which should be used to forecast
-        :param clusters_1d: dict of all k-clusters
-        :param composites_1d: dict of composites with time and one-dimensional array
-        :param data_year_1d: np.ndarray with all  data of precursors
-        :param year: year which should be forecasted
-        """
-        # Merge only those precursors which were selected
-        self.selected_composites_1D = np.hstack([composites_1d[i] for i in forecast_predictands])
-        self.selected_data_1d = np.hstack([data_year_1d[i] for i in forecast_predictands])
-
-        # need those additional brackets, because it can be multiple input data and the outer brackets indicate the
-        # the length of the input data
-        self.alpha_all = np.asarray([self._projection_coefficients_year(year)])
-
-        # Calculate projection coefficients
-        self.beta_all = np.zeros(self.k)
-        self.beta_all = self.model.predict(self.alpha_all)[0]
-        
-        self.alpha_all = np.asarray(self._projection_coefficients_year(year))
-        
-        self.forecast_var = np.zeros(len(clusters_1d[0]))
-        for i in range(int(self.k)):
-
-
-            
-    # ~ def prediction_nn(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, data_year_1d: dict,
-                      # ~ year: int):
-        # ~ """make forecast_nn
-        # ~ :param forecast_predictands: list contains predictands which should be used to forecast
-        # ~ :param clusters_1d: dict of all k-clusters
-        # ~ :param composites_1d: dict of composites with time and one-dimensional array
-        # ~ :param data_year_1d: np.ndarray with all  data of precursors
-        # ~ :param year: year which should be forecasted
-        # ~ """
-        # ~ # Merge only those precursors which were selected
-        # ~ self.selected_composites_1D = np.hstack([composites_1d[i] for i in forecast_predictands])
-        # ~ self.selected_data_1d = np.hstack([data_year_1d[i] for i in forecast_predictands])
-
-        # ~ # need those additional brackets, because it can be multiple input data and the outer brackets indicate the
-        # ~ # the length of the input data
-        # ~ self.alpha_all = np.asarray([self._projection_coefficients_year(year)])
-        # ~ # Calculate projection coefficients
-        # ~ self.beta_all = np.zeros(self.k)
-        # ~ self.beta_all = self.model.predict(self.alpha_all)[0]
-
-        # ~ self.forecast_var = np.zeros(len(clusters_1d[0]))
-        # ~ for i in range(int(self.k)):
-
-            # ~ self.forecast_var += self.beta_all[i] * clusters_1d[int(i)]
-            self.forecast_var += self.alpha_all[i] * clusters_1d[int(i)]
-        return self.forecast_var
-
-    def calc_alphas_for_talos(self, X_train: dict, y_train: np.array, params):
-        # Merge only those precursors which were selected
-        self.selected_composites_1D = np.hstack([params["composites_1d"][i] for i in params["forecast_predictands"]])
-        self.selected_data_1d = np.hstack([X_train[i] for i in params["forecast_predictands"]])
-        self.clusters_1d = params["clusters_1d"]
-
-        # Calculate projection coefficients for all points in training set
-        self.len_selected_data = len(self.selected_data_1d)
-        self.alpha_all_years = np.zeros((self.len_selected_data, self.k))
-        self.alpha_matrix = np.zeros((self.k, self.k))
-        for year in range(self.len_selected_data):
-            self.alpha_all_years[year] = self._projection_coefficients_year(year)
-
-        self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo = \
-            self.train_test_split_nn(self.k, self.alpha_all_years, y_train)
-        return self.alphas_train, self.alphas_val,self.y_train_pseudo, self.y_val_pseudo
-
-    # noinspection PyPep8Naming
-    def train_nn_talos(self, X_train,  y_train, X_val, y_val, params):
-        """
-        optimize forecast by using different parameters to train nn for forecast
-        :param forecast_predictands: list contains predictands which should be used to forecast
-        :param X_train: np.ndarray with all  data of precursors
-        :param y_train: np.ndarray with all  data of predictands
-        :param params: dictionary of all tunable hyper parameters
-        """
-        self.alphas_train = X_train
-        self.alphas_val= X_val
-        self.y_train_pseudo = y_train
-        self.y_val_pseudo = y_val
-
-        self.logger.info('Create network (model): specify number of neurons in each layer:')
-        np.random.seed(3456)
-
-        self.model_ta = Sequential()  # kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None),
-        # bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None)
-
-        self.model_ta.add(Dense(params["first_neuron"], input_dim=self.k, activation=params['activation'],))  # kernel_initializer=params['kernel_initializer']
-        # self.model_ta.add(Dropout(params['dropout']))
-        # if we want to also test for number of layers and shapes, that's possible
-        # https://github.com/autonomio/talos/blob/master/examples/A%20Very%20Short%20Introduction%20to%20Hyperparameter%20Optimization%20of%20Keras%20Models%20with%20Talos.ipynb
-        # https: // autonomio.github.io / docs_talos /  # models
-        # https: // github.com / autonomio / talos / blob / master / talos / model / hidden_layers.py
-        # https://alphascientist.com/hyperparameter_optimization_with_talos.html
-        for i in range(params['hidden_layers']):
-            print(f"adding layer {i + 1}")
-            self.model_ta.add(
-                Dense(params["first_neuron"], input_dim=len(self.alphas_train[0]), activation=params['activation'],
-                      kernel_initializer=params['kernel_initializer']))
-
-        self.model_ta.add(
-            Dense(self.k, activation=params['last_activation'], kernel_initializer=params['kernel_initializer']))
-
-        # ~ wr_cl_loss = wrapper_function_cluster_loss(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
-                                                   # ~ params['batch_size'])
-
-        wr_cl_loss = wrapper_function_cluster_corr(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
-                                                   params['batch_size'])
-
-        self.model_ta.compile(
-            loss=wr_cl_loss, optimizer=params['optimizer'],
-            metrics=['mean_squared_error'])
-
-        # noinspection PyAttributeOutsideInit
-        self.history = self.model_ta.fit(np.array(self.alphas_train), np.array(self.y_train_pseudo),
-                                       epochs=params['epochs'],
-                                      batch_size=params['batch_size'], verbose=0)  #validation_data=(self.alphas_val, self.y_val_pseudo),
-
-        # Saves the entire model into a file named as  'dnn_model.h5'
-        file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var}-{str(len(params["forecast_predictands"]))}-precursor/model/'
-        Path(file_path).mkdir(parents=True, exist_ok=True)
-        self.model_ta.save(f'{file_path}/dnn_model-{self.nr_neurons}_{self.k}_cluster_{params["forecast_predictands"]}.h5')
-        self.logger.info('initial loss=' + repr(self.history.history["loss"][1]) + ', final=' + repr(
-            self.history.history["loss"][-1]))
-        self.logger.info(repr(self.history))
-
-        file_path = f'{self.output_path}/output-{self.output_label}/' \
-                    f'{self.var}-{str(len([params["forecast_predictands"]]))}-precursor/progress/'
-        Path(file_path).mkdir(parents=True, exist_ok=True)
-
-        # test data
-        # Calculate forecast_nn for all years
-        pattern_corr_values = []
-
-        # Prediction
-        # self.x_test = np.hstack([params["x_test"][i] for i in self.list_precursors_all])
-        forecast_data = np.zeros((len(params["y_test"]),
-                                  len(params["y_test"][1])))
-        for year in range(len(params["y_test"])):  # len(y_test[predictand.var])):
-            print(year)
-            forecast_temp = self.prediction_nn(self.list_precursors_all, self.clusters_1d,
-                                                      params["composites_1d"], params["x_test"], year)
-            # Assign forecast_nn data to array
-            forecast_data[year] = forecast_temp
-
-            # Calculate pattern correlation
-            pattern_corr_values.append(
-                stats.pearsonr(forecast_temp, params["y_test"][year])[0])
-
-            # Calculate time correlation for each point
-        time_correlation, significance = self.calculate_time_correlation_all_times(
-            np.array(params["y_test"]), forecast_data)
-        params["time_corr"] = np.nanmean(time_correlation)
-        params["pattern_corr"] = np.nanmean(pattern_corr_values)
-        df_parameters_opt = pd.DataFrame({
-            "time_corr": np.nanmean(time_correlation), "pattern_corr": np.nanmean(pattern_corr_values),
-        "lr": params["lr"],
-        "activation": "relu",
-        "kernel_initializer": "random_uniform",
-         "optimizer": params['optimizer'],
-         "losses": "logcos",
-         "shapes": "brick",
-         'first_neuron': [16],
-        'forecast_predictands': self.list_precursors,
-         'hidden_layers': params["hidden_layers"],
-         'dropout': params["dropout"],
-         'batch_size': params["batch_size"],
-
-        }, index=[self.index_df])
-        filename = f'{file_path}/skill_correlation-{self.var}-opt.csv'
-        with open(filename, 'a') as f:
-            df_parameters_opt.to_csv(f, header=f.tell() == 0)
-            self.index_df +=1
-        del df_parameters_opt
-        return self.history, self.model_ta
-
-
     def prediction_nn(self, forecast_predictands: list, clusters_1d: dict, composites_1d: dict, data_year_1d: dict,
                       year: int):
         """make forecast_nn
@@ -883,12 +239,221 @@ class ForecastNN(Forecast):
         self.beta_all = np.zeros(self.k)
 
         self.beta_all = self.model_ta.predict(self.alpha_all)[0]
-        # print(f"self.beta_all: {self.beta_all}")
+        print(f"self.beta_all: {self.beta_all}")
+        print(f"self.alpha_all: {self.alpha_all}")
 
         self.forecast_var = np.zeros(len(clusters_1d[0]))
         for i in range(int(self.k)):
             self.forecast_var += self.beta_all[i] * clusters_1d[int(i)]
         return self.forecast_var
+
+
+    def calc_alphas_for_talos(self, X_train: dict, y_train: np.array, params):
+        """
+        calculate alpha values for NN training
+        :param X_train: np.ndarray with all  data of precursors
+        :param y_train: np.ndarray with all  data of predictands
+        :param params: dictionary of all tunable hyper parameters
+        """
+        # Merge only those precursors which were selected
+        print(params["forecast_predictands"])
+        print(params["composites_1d"])
+        self.selected_composites_1D = params["composites_1d"][params["forecast_predictands"][0]]
+
+        self.clusters_1d = params["clusters_1d"]
+        self.alpha_matrix = np.zeros((len(params["clusters_1d"]), len(params["clusters_1d"])))
+        self.len_selected_data = len(X_train[params["forecast_predictands"][0]])
+        print("X_train[params[forecast_predictands][0]].shape")
+        print(X_train[params["forecast_predictands"][0]].shape)
+
+        self.selected_composites_1D = params["composites_1d"][params["forecast_predictands"][0]]
+        print("self.selected_composites_1D")
+        print(self.selected_composites_1D)
+        # Calculate projection coefficients for all points in training set
+        print(self.k)
+        print(self.len_selected_data)
+        self.alpha_all_years = np.zeros((self.len_selected_data, self.k))
+        print("self.composite normalization")
+        print(np.std(self.selected_composites_1D[0]))
+        print(np.std(self.selected_composites_1D[1]))
+        print(np.std(self.selected_composites_1D[2]))
+        print(np.std(self.selected_composites_1D[3]))
+        print(np.std(self.selected_composites_1D[4]))
+
+        for year in range(self.len_selected_data):
+            self.selected_data_1d = X_train[params["forecast_predictands"][0]][year]
+            print("selected_data_1d normalization")
+            print(np.std(self.selected_data_1d ))
+            self.alpha_all = self._projection_coefficients()
+            print("self.alpha_all")
+            print(self.alpha_all)
+            self.alpha_all_years[year] = self.alpha_all
+
+        self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo = \
+            self.train_test_split_nn(self.k, self.alpha_all_years, y_train)
+        return self.alphas_train, self.alphas_val,self.y_train_pseudo, self.y_val_pseudo
+
+
+        # # Merge only those precursors which were selected
+        # self.selected_composites_1D = np.hstack([params["composites_1d"][i] for i in params["forecast_predictands"]])
+        # self.selected_data_1d = np.hstack([X_train[i] for i in params["forecast_predictands"]])
+        # self.clusters_1d = params["clusters_1d"]
+        #
+        # # Calculate projection coefficients for all points in training set
+        # self.len_selected_data = len(self.selected_data_1d)
+        # self.alpha_all_years = np.zeros((self.len_selected_data, self.k))
+        # self.alpha_matrix = np.zeros((self.k, self.k))
+        # for year in range(self.len_selected_data):
+        #     self.alpha_all_years[year] = self._projection_coefficients_year(year)
+        #     print(self.alpha_all_years[year])
+        #
+        # self.alphas_train, self.alphas_val, self.y_train_pseudo, self.y_val_pseudo = \
+        #     self.train_test_split_nn(self.k, self.alpha_all_years, y_train)
+        # return self.alphas_train, self.alphas_val,self.y_train_pseudo, self.y_val_pseudo
+
+
+    # noinspection PyPep8Naming
+    def train_nn_talos(self, X_train,  y_train, X_val, y_val, params):
+        """
+        optimize forecast by using different parameters to train nn for forecast
+        :param forecast_predictands: list contains predictands which should be used to forecast
+        :param X_train: np.ndarray with all  data of precursors
+        :param y_train: np.ndarray with all  data of predictands
+        :param params: dictionary of all tunable hyper parameters
+        """
+        self.alphas_train = X_train
+        self.alphas_val= X_val
+        self.y_train_pseudo = y_train
+        self.y_val_pseudo = y_val
+        print(params["precursor"])
+        self.logger.info('Create network (model): specify number of neurons in each layer:')
+        np.random.seed(3456)
+
+        self.model_ta = Sequential()  # kernel_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None),
+        # bias_initializer=initializers.TruncatedNormal(mean=0.0, stddev=0.02, seed=None)
+
+        # self.model_ta.add(Dense(params["first_neuron"], input_dim=self.k, activation=params['activation'],))
+        self.model_ta.add(Dense(params["first_neuron"], activation=params['activation']))
+        # ,
+        # kernel_initializer = tf.keras.initializers.RandomNormal(mean=1.0, stddev=0.05,
+        #                                                         seed=1),
+        # bias_initializer = initializers.RandomNormal(mean=1.0, stddev=0.05, seed=1)
+        # ,
+        # kernel_initializer = tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.5,
+        #                                                         seed=1),
+        # bias_initializer = initializers.RandomNormal(mean=0.0, stddev=0.5, seed=1)
+
+        # kernel_initializer=params['kernel_initializer']
+        # self.model_ta.add(Dropout(params['dropout']))
+        # if we want to also test for number of layers and shapes, that's possible
+        # https://github.com/autonomio/talos/blob/master/examples/A%20Very%20Short%20Introduction%20to%20Hyperparameter%20Optimization%20of%20Keras%20Models%20with%20Talos.ipynb
+        # https: // autonomio.github.io / docs_talos /  # models
+        # https: // github.com / autonomio / talos / blob / master / talos / model / hidden_layers.py
+        # https://alphascientist.com/hyperparameter_optimization_with_talos.html
+        for i in range(params['hidden_layers']):
+            print(f"adding layer {i + 1}")
+            self.model_ta.add(
+                Dense(params["first_neuron"], input_dim=len(self.alphas_train[0]), activation=params['activation'],
+                      kernel_initializer=params['kernel_initializer']))
+
+        self.model_ta.add(
+            Dense(self.k, activation=params['last_activation'], kernel_initializer=params['kernel_initializer']))
+
+        # ~ wr_cl_loss = wrapper_function_cluster_loss(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
+                                                   # ~ params['batch_size'])
+
+        # wr_cl_loss = wrapper_function_cluster_corr(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
+        #                                            params['batch_size'])
+
+        wr_cl_loss = wrapper_function_cluster_taylor(np.asarray(self.clusters_1d), np.asarray(params["y_train"]), self.k,
+                                                   params['batch_size'])
+
+        self.model_ta.compile(
+            loss=wr_cl_loss, optimizer=params['optimizer'],
+            metrics=['mean_squared_error'])
+
+        # noinspection PyAttributeOutsideInit
+        # print(self.alphas_train[0:20])
+        self.history = self.model_ta.fit(np.array(self.alphas_train), np.array(self.y_train_pseudo),
+                                       epochs=params['epochs'],
+                                      batch_size=params['batch_size'], verbose=0)  #validation_data=(self.alphas_val, self.y_val_pseudo),
+
+        # Saves the entire model into a file named as  'dnn_model.h5'
+        file_path = f'{self.output_path}/output-{self.output_label}/' \
+                    f'{self.var}-{str(len(params["forecast_predictands"]))}-precursor/model/'
+        Path(file_path).mkdir(parents=True, exist_ok=True)
+        # self.model_ta.save(f'{file_path}/dnn_model-{params["first_neuron"]}_{self.k}_cluster_{params["precursor"]}.h5')
+        self.logger.info('initial loss=' + repr(self.history.history["loss"][1]) + ', final=' + repr(
+            self.history.history["loss"][-1]))
+        self.logger.info(repr(self.history))
+
+
+
+        # test data
+        # Calculate forecast_nn for all years
+        pattern_corr_values = []
+        taylor_skill_values = []
+
+        # Prediction
+        # self.x_test = np.hstack([params["x_test"][i] for i in self.list_precursors_all])
+        forecast_data = np.zeros((len(params["y_test"]),
+                                  len(params["y_test"][1])))
+        for year in range(len(params["y_test"])):  # len(y_test[predictand.var])):
+            forecast_temp = self.prediction_nn(self.list_precursors_all, self.clusters_1d,
+                                                      params["composites_1d"], params["x_test"], year)
+            # Assign forecast_nn data to array
+            forecast_data[year] = forecast_temp
+
+            # Calculate pattern correlation and taylor skill
+            if not np.isnan(forecast_temp).any():
+                cl_corr = stats.pearsonr(forecast_temp, params["y_test"][year])[0]
+                pattern_corr_values.append(cl_corr)
+                cl_std_obs = np.std(params["y_test"][year])
+                cl_std_mod = tfp.stats.stddev(forecast_temp)
+                ax = cl_std_mod / cl_std_obs
+                taylor_skill_values.append((4*(1 + cl_corr)) / ( 2 * (ax + 1/ax)**2) )# ((4*(1 + corr)**4) / ( 16 * (ax + 1/ax)**2))
+            print(np.nanmean(forecast_temp))
+
+
+        # Calculate time correlation for each point
+        if not np.isnan(forecast_data).any():
+            time_correlation, significance = self.calculate_time_correlation_all_times(
+                np.array(params["y_test"]), forecast_data)
+        else:
+            time_correlation, significance = -1, 0
+        params["time_corr"] = np.nanmean(time_correlation)
+        params["pattern_corr"] = np.nanmean(pattern_corr_values)
+        params["taylor_skill"] = np.nanmean(taylor_skill_values)
+        df_parameters_opt = pd.DataFrame({
+            "time_corr": np.nanmean(time_correlation), "pattern_corr": np.nanmean(pattern_corr_values),
+            "taylor_skill" : np.nanmean(taylor_skill_values),
+        "lr": params["lr"],
+        "activation": "relu",
+        "kernel_initializer": "random_uniform",
+         "optimizer": params['optimizer'],
+         "losses": "logcos",
+         "shapes": "brick",
+         'first neuron': params["first_neuron"],
+        'forecast_predictands': self.list_precursors,
+         'hidden_layers': params["hidden_layers"],
+         'dropout': params["dropout"],
+         'batch_size': params["batch_size"],
+         'epochs': params["epochs"],
+
+        }, index=[self.index_df])
+        filename = f'{file_path}/skill_correlation-{self.var}-{params["forecast_predictands"]}-opt.csv'
+        with open(filename, 'a') as f:
+            df_parameters_opt.to_csv(f, header=f.tell() == 0)
+            self.index_df +=1
+        del df_parameters_opt
+        return self.history, self.model_ta
+
+
+        self.forecast_var = np.zeros(len(clusters_1d[0]))
+        for i in range(int(self.k)):
+            self.forecast_var += self.beta_all[i] * clusters_1d[int(i)]
+        return self.forecast_var
+
 
     def _projection_coefficients_year(self, year):
         """ calculate projection coefficients"""

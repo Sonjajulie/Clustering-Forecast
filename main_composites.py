@@ -31,7 +31,7 @@ def main(cl_parser: ClusteringParser, cl_config: dict):
     # pred_clusters = Clusters(inifile, output_label, cl_config)
     logger.debug(f"inifile: {inifile}")
     method_name = "ward"
-    for k in [4,5,6,7,8]:
+    for k in [5,6]:
     # ~ for k in [3]:
         with open(rf"output-{output_label}/{predictand_var}/Cluster/ward_Cluster_{k}/files/timeSeries_ward_{k}_f.txt", "rb") as input_file:
             f = np.array(pickle.load(input_file), dtype=int)
