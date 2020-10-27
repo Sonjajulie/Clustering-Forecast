@@ -11,7 +11,7 @@ cftime==1.0.4.2
 chardet==3.0.4
 Click==7.0
 cloudpickle==1.2.2
-cryptography==2.8
+cryptography==3.2
 cycler==0.10.0
 cytoolz==0.10.1
 dask==2.8.1
